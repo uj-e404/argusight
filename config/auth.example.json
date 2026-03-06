@@ -1,0 +1,12 @@
+{
+  "users": [
+    {
+      "username": "admin",
+      "passwordHash": "<generated-by-pnpm-init-auth>"
+    }
+  ],
+  "jwt": {
+    "secret": "<generated-by-pnpm-init-auth>",
+    "expiresIn": "24h"
+  }
+}

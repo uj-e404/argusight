@@ -36,6 +36,14 @@ yarn-error.log*
 # vercel
 .vercel
 
+# argusight config (sensitive)
+config/servers.json
+config/auth.json
+config/keys/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# code review
+.1ref/code-review/

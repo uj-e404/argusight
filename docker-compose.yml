@@ -1,0 +1,14 @@
+services:
+  argusight:
+    build: .
+    container_name: argusight
+    ports:
+      - "4959:4959"
+    volumes:
+      - ./config:/app/config
+      - ~/.ssh:/app/config/keys:ro
+    environment:
+      - PORT=4959
+      - NODE_ENV=production
+      - CONFIG_PATH=/app/config
+    restart: unless-stopped

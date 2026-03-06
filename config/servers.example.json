@@ -1,0 +1,56 @@
+{
+  "_comment": "SSH key authentication is strongly recommended over password auth. If you must use passwords, use environment variable references (e.g. \"$ENV:SSH_PASS_MYSERVER\") instead of plain-text passwords.",
+  "servers": [
+    {
+      "id": "my-web-server",
+      "name": "Web Server",
+      "host": "192.168.1.100",
+      "port": 22,
+      "username": "admin",
+      "authType": "key",
+      "privateKeyPath": "/app/config/keys/id_ed25519",
+      "type": "linux",
+      "os": "Ubuntu 24.04",
+      "specs": {
+        "cpu": "Intel i5-2400 (4 cores)",
+        "ram": "8 GB"
+      },
+      "features": ["cpu", "ram", "disk", "processes", "docker"],
+      "tags": ["production"]
+    },
+    {
+      "id": "my-router",
+      "name": "Main Router",
+      "host": "192.168.1.1",
+      "port": 22,
+      "username": "admin",
+      "authType": "key",
+      "privateKeyPath": "/app/config/keys/id_rsa",
+      "type": "mikrotik",
+      "os": "RouterOS 7.x",
+      "specs": {
+        "model": "RB4011"
+      },
+      "features": ["cpu", "ram", "traffic", "domains"],
+      "tags": ["network"]
+    },
+    {
+      "id": "my-windows-pc",
+      "name": "Windows PC",
+      "host": "192.168.1.50",
+      "port": 22,
+      "username": "user",
+      "authType": "password",
+      "password": "$ENV:SSH_PASS_WINDOWS_PC",
+      "type": "windows",
+      "os": "Windows 11",
+      "specs": {
+        "cpu": "Intel i5-12400",
+        "ram": "32 GB",
+        "gpu": "NVIDIA RTX 4060"
+      },
+      "features": ["cpu", "ram", "disk", "processes", "gpu"],
+      "tags": ["personal"]
+    }
+  ]
+}

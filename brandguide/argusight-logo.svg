@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#D4A853;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B8860B;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="darkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E1E2E;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0F1117;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#D4A853;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#D4A853;stop-opacity:0" />
+    </radialGradient>
+    <clipPath id="eyeClip">
+      <path d="M256 140 C340 140 420 200 460 256 C420 312 340 372 256 372 C172 372 92 312 52 256 C92 200 172 140 256 140Z"/>
+    </clipPath>
+  </defs>
+  
+  <!-- Subtle glow behind the eye -->
+  <circle cx="256" cy="256" r="180" fill="url(#glowGrad)"/>
+  
+  <!-- Outer eye shape - slate/charcoal -->
+  <path d="M256 120 C355 120 445 190 490 256 C445 322 355 392 256 392 C157 392 67 322 22 256 C67 190 157 120 256 120Z" 
+        fill="#1E1E2E" stroke="url(#goldGrad)" stroke-width="3"/>
+  
+  <!-- Inner eye contour -->
+  <path d="M256 155 C338 155 410 205 448 256 C410 307 338 357 256 357 C174 357 102 307 64 256 C102 205 174 155 256 155Z" 
+        fill="#14141F"/>
+  
+  <!-- Iris outer ring -->
+  <circle cx="256" cy="256" r="82" fill="#1A1A2E" stroke="url(#goldGrad)" stroke-width="2.5"/>
+  
+  <!-- Iris pattern rings -->
+  <circle cx="256" cy="256" r="70" fill="none" stroke="#D4A853" stroke-width="0.8" opacity="0.4"/>
+  <circle cx="256" cy="256" r="58" fill="none" stroke="#D4A853" stroke-width="0.5" opacity="0.3"/>
+  
+  <!-- Iris fill with gradient -->
+  <circle cx="256" cy="256" r="65" fill="url(#goldGrad)" opacity="0.15"/>
+  
+  <!-- Pupil -->
+  <circle cx="256" cy="256" r="32" fill="#0F1117"/>
+  <circle cx="256" cy="256" r="28" fill="#080810"/>
+  
+  <!-- Pupil inner glow -->
+  <circle cx="256" cy="256" r="18" fill="url(#goldGrad)" opacity="0.08"/>
+  
+  <!-- Light reflection spots -->
+  <circle cx="242" cy="238" r="10" fill="#FFFFFF" opacity="0.7"/>
+  <circle cx="270" cy="268" r="5" fill="#FFFFFF" opacity="0.35"/>
+  
+  <!-- Geometric accent lines radiating from iris -->
+  <line x1="338" y1="256" x2="440" y2="256" stroke="#D4A853" stroke-width="1" opacity="0.3"/>
+  <line x1="174" y1="256" x2="72" y2="256" stroke="#D4A853" stroke-width="1" opacity="0.3"/>
+  <line x1="256" y1="174" x2="256" y2="155" stroke="#D4A853" stroke-width="1" opacity="0.25"/>
+  <line x1="256" y1="338" x2="256" y2="357" stroke="#D4A853" stroke-width="1" opacity="0.25"/>
+  
+  <!-- Small geometric dots at eye tips -->
+  <circle cx="28" cy="256" r="4" fill="#D4A853" opacity="0.6"/>
+  <circle cx="484" cy="256" r="4" fill="#D4A853" opacity="0.6"/>
+</svg>

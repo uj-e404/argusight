@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" width="800" height="200">
+  <defs>
+    <linearGradient id="goldGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#D4A853;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B8860B;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="miniGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#D4A853;stop-opacity:0.2" />
+      <stop offset="100%" style="stop-color:#D4A853;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Mini eye icon -->
+  <g transform="translate(40, 100)">
+    <circle cx="0" cy="0" r="42" fill="url(#miniGlow)"/>
+    <path d="M0 -30 C22 -30 42 -12 52 0 C42 12 22 30 0 30 C-22 30 -42 12 -52 0 C-42 -12 -22 -30 0 -30Z" 
+          fill="#1E1E2E" stroke="url(#goldGrad2)" stroke-width="2"/>
+    <path d="M0 -22 C18 -22 33 -10 40 0 C33 10 18 22 0 22 C-18 22 -33 10 -40 0 C-33 -10 -18 -22 0 -22Z" 
+          fill="#14141F"/>
+    <circle cx="0" cy="0" r="16" fill="#1A1A2E" stroke="url(#goldGrad2)" stroke-width="1.5"/>
+    <circle cx="0" cy="0" r="12" fill="url(#goldGrad2)" opacity="0.15"/>
+    <circle cx="0" cy="0" r="7" fill="#0F1117"/>
+    <circle cx="-3" cy="-4" r="2.5" fill="#FFFFFF" opacity="0.7"/>
+    <circle cx="4" cy="3" r="1.2" fill="#FFFFFF" opacity="0.35"/>
+    <circle cx="-48" cy="0" r="2" fill="#D4A853" opacity="0.6"/>
+    <circle cx="48" cy="0" r="2" fill="#D4A853" opacity="0.6"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="112" y="115" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="62" font-weight="700" letter-spacing="3">
+    <tspan fill="#E8E6E0">ARGU</tspan><tspan fill="#D4A853">SIGHT</tspan>
+  </text>
+  
+  <!-- Tagline -->
+  <text x="114" y="148" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="400" letter-spacing="6" fill="#6B6B7B">
+    ALL SEEING INFRASTRUCTURE MONITORING
+  </text>
+</svg>
