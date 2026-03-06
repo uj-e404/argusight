@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -34,6 +34,7 @@ const MIKROTIK_TABS = ['Stats', 'Traffic', 'Domains', 'Hotspot'];
 
 export function ServerDetailClient({ serverId, initialServer }: ServerDetailClientProps) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [server, setServer] = useState<ServerInfo | null>(initialServer);
   const { subscribe, unsubscribe } = useWebSocket();
 
@@ -80,10 +81,15 @@ export function ServerDetailClient({ serverId, initialServer }: ServerDetailClie
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => router.push('/dashboard')}
-          className="text-text-secondary hover:text-text-primary"
+          onClick={() => startTransition(() => router.push('/dashboard'))}
+          className={`text-text-secondary hover:text-text-primary ${isPending ? 'opacity-60' : ''}`}
+          disabled={isPending}
         >
-          <ArrowLeft className="h-5 w-5" />
+          {isPending ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <ArrowLeft className="h-5 w-5" />
+          )}
         </Button>
         <div className="flex items-center gap-3">
           <OsIcon type={server.type} size={20} className="text-text-muted" />

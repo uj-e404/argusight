@@ -1,9 +1,11 @@
 'use client';
 
+import { useState, useTransition } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { OsIcon } from '@/components/icons/OsIcon';
+import { Loader2 } from 'lucide-react';
 import type { OverviewServerData } from '@/lib/types';
 
 interface SidebarProps {
@@ -21,6 +23,8 @@ const FILTERS = [
 export function Sidebar({ servers, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
   // Extract active filter from search params isn't easy in a non-page component,
   // so sidebar shows all servers always. Filtering is on the overview page.
@@ -51,7 +55,7 @@ export function Sidebar({ servers, onNavigate }: SidebarProps) {
             <button
               key={f.value}
               onClick={() => {
-                router.push('/dashboard');
+                startTransition(() => router.push('/dashboard'));
                 onNavigate?.();
               }}
               className="w-full flex items-center justify-between px-3 py-1.5 rounded text-sm text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors"
@@ -74,22 +78,27 @@ export function Sidebar({ servers, onNavigate }: SidebarProps) {
               <button
                 key={server.serverId}
                 onClick={() => {
-                  router.push(`/dashboard/${server.serverId}`);
+                  setPendingId(server.serverId);
+                  startTransition(() => router.push(`/dashboard/${server.serverId}`));
                   onNavigate?.();
                 }}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded text-sm transition-colors ${
                   isActive
                     ? 'text-gold-primary bg-bg-elevated border-l-2 border-gold-primary'
                     : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface'
-                }`}
+                } ${isPending && pendingId === server.serverId ? 'opacity-70' : ''}`}
               >
-                <div
-                  className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    isOnline
-                      ? 'bg-status-healthy status-dot-online'
-                      : 'bg-status-critical'
-                  }`}
-                />
+                {isPending && pendingId === server.serverId ? (
+                  <Loader2 className="w-2 h-2 animate-spin flex-shrink-0 text-gold-primary" />
+                ) : (
+                  <div
+                    className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      isOnline
+                        ? 'bg-status-healthy status-dot-online'
+                        : 'bg-status-critical'
+                    }`}
+                  />
+                )}
                 <OsIcon type={server.type} size={14} className="flex-shrink-0 text-text-muted" />
                 <span className="truncate">{server.name}</span>
               </button>

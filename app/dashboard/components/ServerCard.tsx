@@ -1,5 +1,6 @@
 'use client';
 
+import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -27,14 +28,15 @@ interface ServerCardProps {
 
 export function ServerCard({ server, onEdit, onDelete }: ServerCardProps) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const isOnline = server.status === 'connected';
 
   return (
     <div
-      onClick={() => router.push(`/dashboard/${server.serverId}`)}
+      onClick={() => startTransition(() => router.push(`/dashboard/${server.serverId}`))}
       className={`group bg-bg-surface border border-bg-elevated rounded-lg p-4 cursor-pointer transition-all hover:border-gold-primary/30 hover:shadow-lg border-t-2 border-t-gold-primary ${
         !isOnline ? 'opacity-50' : ''
-      }`}
+      } ${isPending ? 'opacity-60 pointer-events-none' : ''}`}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
