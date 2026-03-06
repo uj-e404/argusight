@@ -43,6 +43,7 @@ export function parseDiskUsage(raw: string): DiskInfo[] {
   const lines = raw.trim().split('\n').slice(1); // skip header
   return lines
     .filter((l) => l.trim())
+    .filter((l) => !/squashfs|loop|efivarfs/.test(l))
     .map((line) => {
       const parts = line.trim().split(/\s+/);
       return {

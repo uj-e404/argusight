@@ -95,3 +95,19 @@ export interface GpuInfo {
   memTotal: number;
   memUsed: number;
 }
+
+export interface OverviewServerData {
+  serverId: string;
+  name: string;
+  host: string;
+  type: 'linux' | 'windows' | 'mikrotik';
+  os?: string;
+  specs?: Record<string, string>;
+  features?: string[];
+  tags?: string[];
+  status: 'connected' | 'disconnected' | 'connecting' | 'error';
+  cpu: number;
+  ram: number;
+  disk: number;
+  uptime: string;
+}

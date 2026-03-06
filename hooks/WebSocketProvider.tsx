@@ -1,0 +1,128 @@
+'use client';
+
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+
+type MessageCallback = (data: unknown) => void;
+
+interface WebSocketContextValue {
+  subscribe: (channel: string, callback: MessageCallback) => void;
+  unsubscribe: (channel: string, callback: MessageCallback) => void;
+  isConnected: boolean;
+}
+
+const WebSocketContext = createContext<WebSocketContextValue | null>(null);
+
+export function WebSocketProvider({ children }: { children: React.ReactNode }) {
+  const wsRef = useRef<WebSocket | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const callbacksRef = useRef(new Map<string, Set<MessageCallback>>());
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  const connect = useCallback(() => {
+    if (!mountedRef.current) return;
+    if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) return;
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      if (!mountedRef.current) return;
+      setIsConnected(true);
+      reconnectAttemptRef.current = 0;
+
+      // Resubscribe to all active channels
+      for (const channel of callbacksRef.current.keys()) {
+        ws.send(JSON.stringify({ type: 'subscribe', channel }));
+      }
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        // Route to channel callbacks
+        // For overview messages
+        if (msg.type === 'overview') {
+          const cbs = callbacksRef.current.get('overview');
+          cbs?.forEach((cb) => cb(msg));
+        }
+        // For stats messages (server:{id}:stats)
+        if (msg.type === 'stats' && msg.serverId) {
+          const channel = `server:${msg.serverId}:stats`;
+          const cbs = callbacksRef.current.get(channel);
+          cbs?.forEach((cb) => cb(msg));
+        }
+      } catch {
+        // ignore malformed messages
+      }
+    };
+
+    ws.onclose = () => {
+      if (!mountedRef.current) return;
+      setIsConnected(false);
+      wsRef.current = null;
+
+      // Reconnect with backoff
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
+      reconnectAttemptRef.current++;
+      reconnectTimeoutRef.current = setTimeout(connect, delay);
+    };
+
+    ws.onerror = () => {
+      // onclose will fire after this
+    };
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    connect();
+    return () => {
+      mountedRef.current = false;
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (wsRef.current) {
+        wsRef.current.onclose = null;
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [connect]);
+
+  const subscribe = useCallback((channel: string, callback: MessageCallback) => {
+    let cbs = callbacksRef.current.get(channel);
+    if (!cbs) {
+      cbs = new Set();
+      callbacksRef.current.set(channel, cbs);
+      // Send subscribe message
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'subscribe', channel }));
+      }
+    }
+    cbs.add(callback);
+  }, []);
+
+  const unsubscribe = useCallback((channel: string, callback: MessageCallback) => {
+    const cbs = callbacksRef.current.get(channel);
+    if (!cbs) return;
+    cbs.delete(callback);
+    if (cbs.size === 0) {
+      callbacksRef.current.delete(channel);
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'unsubscribe', channel }));
+      }
+    }
+  }, []);
+
+  return (
+    <WebSocketContext.Provider value={{ subscribe, unsubscribe, isConnected }}>
+      {children}
+    </WebSocketContext.Provider>
+  );
+}
+
+export function useWebSocket() {
+  const ctx = useContext(WebSocketContext);
+  if (!ctx) throw new Error('useWebSocket must be used within WebSocketProvider');
+  return ctx;
+}

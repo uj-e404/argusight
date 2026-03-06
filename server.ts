@@ -6,6 +6,7 @@ import { join } from 'path';
 import { jwtVerify } from 'jose';
 import { sshPool } from './lib/ssh-pool';
 import { setBroadcast } from './lib/broadcast';
+import { startMetricCollector, stopMetricCollector, getRingBuffer } from './lib/metric-collector';
 import type { ServersConfig, AuthConfig, ClientMessage } from './lib/types';
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -55,6 +56,11 @@ app.prepare().then(async () => {
   const subscriptions = new Map<WebSocket, Set<string>>();
 
   server.on('upgrade', async (req, socket, head) => {
+    const { pathname } = new URL(req.url || '/', `http://${req.headers.host}`);
+
+    // Only handle /ws path — let Next.js HMR and other upgrades pass through
+    if (pathname !== '/ws') return;
+
     // Verify JWT from cookie
     const cookies = req.headers.cookie || '';
     const tokenMatch = cookies.match(/argusight-token=([^;]+)/);
@@ -85,7 +91,7 @@ app.prepare().then(async () => {
   const WS_MAX_MESSAGES_PER_SEC = 10;
   const WS_MAX_SUBSCRIPTIONS = 50;
   const WS_MAX_CHANNEL_LENGTH = 100;
-  const WS_CHANNEL_REGEX = /^[a-zA-Z0-9:]+$/;
+  const WS_CHANNEL_REGEX = /^[a-zA-Z0-9:_\-]+$/;
 
   wss.on('connection', (ws) => {
     subscriptions.set(ws, new Set());
@@ -118,6 +124,21 @@ app.prepare().then(async () => {
             return; // Max subscriptions reached
           }
           subs.add(msg.channel);
+
+          // Send ring buffer backfill for stats channels
+          if (msg.channel.endsWith(':stats')) {
+            const serverId = msg.channel.split(':')[1];
+            const buffer = getRingBuffer(serverId);
+            if (buffer.length > 0) {
+              ws.send(JSON.stringify({
+                type: 'stats',
+                serverId,
+                data: buffer,
+                timestamp: new Date().toISOString(),
+                backfill: true,
+              }));
+            }
+          }
         } else if (msg.type === 'unsubscribe') {
           subs.delete(msg.channel);
         }
@@ -134,9 +155,15 @@ app.prepare().then(async () => {
 
   // Broadcast helper
   function broadcast(channel: string, data: unknown) {
+    const parts = channel.split(':');
+    // For "overview" → type=overview, serverId=undefined
+    // For "server:abc123:stats" → type=stats, serverId=abc123
+    const type = parts.length >= 3 ? parts[2] : parts[0];
+    const serverId = parts.length >= 3 ? parts[1] : undefined;
+
     const message = JSON.stringify({
-      type: channel.split(':')[0],
-      serverId: channel.split(':')[1],
+      type,
+      serverId,
       data,
       timestamp: new Date().toISOString(),
     });
@@ -151,6 +178,9 @@ app.prepare().then(async () => {
   // Make broadcast available for metric collector via singleton module
   setBroadcast(broadcast);
 
+  // Always start metric collector (supports dynamic add/remove)
+  startMetricCollector(() => subscriptions, serversConfig.servers);
+
   // Connect to SSH servers
   if (serversConfig.servers.length > 0) {
     await sshPool.connectAll(serversConfig.servers);
@@ -163,6 +193,7 @@ app.prepare().then(async () => {
   // Graceful shutdown
   const shutdown = () => {
     console.log('[server] Shutting down...');
+    stopMetricCollector();
     sshPool.disconnectAll();
     wss.clients.forEach((ws) => ws.close());
     wss.close();

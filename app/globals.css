@@ -122,3 +122,53 @@
     linear-gradient(90deg, rgba(212, 168, 83, 0.03) 1px, transparent 1px);
   background-size: 40px 40px;
 }
+
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.4); }
+  50% { box-shadow: 0 0 6px 2px rgba(74, 222, 128, 0.3); }
+}
+
+.status-dot-online {
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+/* Interactive Elements Cursor Fix */
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+button:hover:not(:disabled),
+[role="button"]:hover:not(:disabled),
+input[type="button"]:hover:not(:disabled),
+input[type="submit"]:hover:not(:disabled),
+input[type="reset"]:hover:not(:disabled) {
+  cursor: pointer !important;
+}
+
+button:disabled,
+[role="button"]:disabled,
+input:disabled {
+  cursor: not-allowed !important;
+}
+
+/* Loading state cursor */
+.cursor-wait,
+[data-loading="true"] {
+  cursor: wait !important;
+}
+
+/* Link cursor */
+a,
+[role="link"] {
+  cursor: pointer !important;
+}
+
+a:hover,
+[role="link"]:hover {
+  cursor: pointer !important;
+}
