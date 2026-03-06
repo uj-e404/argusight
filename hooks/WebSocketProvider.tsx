@@ -3,10 +3,13 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 
 type MessageCallback = (data: unknown) => void;
+type ReconnectCallback = () => void;
 
 interface WebSocketContextValue {
   subscribe: (channel: string, callback: MessageCallback) => void;
   unsubscribe: (channel: string, callback: MessageCallback) => void;
+  onReconnect: (cb: ReconnectCallback) => void;
+  offReconnect: (cb: ReconnectCallback) => void;
   isConnected: boolean;
 }
 
@@ -19,6 +22,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptRef = useRef(0);
   const mountedRef = useRef(true);
+  const lastMessageRef = useRef<number>(Date.now());
+  const staleCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasConnectedRef = useRef(false);
+  const reconnectCallbacksRef = useRef(new Set<ReconnectCallback>());
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
@@ -32,14 +39,30 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       if (!mountedRef.current) return;
       setIsConnected(true);
       reconnectAttemptRef.current = 0;
+      lastMessageRef.current = Date.now();
 
       // Resubscribe to all active channels
       for (const channel of callbacksRef.current.keys()) {
         ws.send(JSON.stringify({ type: 'subscribe', channel }));
       }
+
+      // Fire reconnect callbacks (skip first connect)
+      if (hasConnectedRef.current) {
+        reconnectCallbacksRef.current.forEach((cb) => cb());
+      }
+      hasConnectedRef.current = true;
+
+      // Start stale message check (server broadcasts overview every 5s, so 45s silence = stale)
+      if (staleCheckRef.current) clearInterval(staleCheckRef.current);
+      staleCheckRef.current = setInterval(() => {
+        if (Date.now() - lastMessageRef.current > 45_000) {
+          ws.close();
+        }
+      }, 10_000);
     };
 
     ws.onmessage = (event) => {
+      lastMessageRef.current = Date.now();
       try {
         const msg = JSON.parse(event.data);
         // Route to channel callbacks
@@ -63,6 +86,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       if (!mountedRef.current) return;
       setIsConnected(false);
       wsRef.current = null;
+      if (staleCheckRef.current) {
+        clearInterval(staleCheckRef.current);
+        staleCheckRef.current = null;
+      }
 
       // Reconnect with backoff
       const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
@@ -81,6 +108,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mountedRef.current = false;
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (staleCheckRef.current) clearInterval(staleCheckRef.current);
       if (wsRef.current) {
         wsRef.current.onclose = null;
         wsRef.current.close();
@@ -114,8 +142,16 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const onReconnect = useCallback((cb: ReconnectCallback) => {
+    reconnectCallbacksRef.current.add(cb);
+  }, []);
+
+  const offReconnect = useCallback((cb: ReconnectCallback) => {
+    reconnectCallbacksRef.current.delete(cb);
+  }, []);
+
   return (
-    <WebSocketContext.Provider value={{ subscribe, unsubscribe, isConnected }}>
+    <WebSocketContext.Provider value={{ subscribe, unsubscribe, onReconnect, offReconnect, isConnected }}>
       {children}
     </WebSocketContext.Provider>
   );

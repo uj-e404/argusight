@@ -96,6 +96,18 @@ export interface GpuInfo {
   memUsed: number;
 }
 
+export interface GpuProcessInfo {
+  pid: number;
+  memoryUsed: number | null; // MiB, null when N/A (Windows WDDM)
+  name: string;
+}
+
+export interface DiskSmartStatus {
+  device: string;
+  healthy: boolean;
+  status: string;
+}
+
 export interface OverviewServerData {
   serverId: string;
   name: string;

@@ -10,7 +10,7 @@ export function useServerStats(serverId: string) {
   const [data, setData] = useState<CpuRamData[]>([]);
   const [loading, setLoading] = useState(true);
   const dataRef = useRef<CpuRamData[]>([]);
-  const { subscribe, unsubscribe } = useWebSocket();
+  const { subscribe, unsubscribe, onReconnect, offReconnect } = useWebSocket();
 
   const handleStats = useCallback((msg: unknown) => {
     const m = msg as { data: CpuRamData | CpuRamData[]; backfill?: boolean };
@@ -39,6 +39,13 @@ export function useServerStats(serverId: string) {
     subscribe(channel, handleStats);
     return () => unsubscribe(channel, handleStats);
   }, [serverId, subscribe, unsubscribe, handleStats]);
+
+  // Brief loading indicator on reconnect (server sends backfill on resubscribe)
+  useEffect(() => {
+    const handleReconnect = () => setLoading(true);
+    onReconnect(handleReconnect);
+    return () => offReconnect(handleReconnect);
+  }, [onReconnect, offReconnect]);
 
   return { data, loading };
 }

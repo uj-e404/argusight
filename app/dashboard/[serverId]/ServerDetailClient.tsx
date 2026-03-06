@@ -8,7 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OsIcon } from '@/components/icons/OsIcon';
 import { CpuRamChart } from './components/CpuRamChart';
-import { PlaceholderTab } from './components/PlaceholderTab';
+import { DiskTable } from './components/DiskTable';
+import { ProcessTable } from './components/ProcessTable';
+import { DockerTable } from './components/DockerTable';
+import { GpuStats } from './components/GpuStats';
 import { useWebSocket } from '@/hooks/WebSocketProvider';
 import type { OverviewServerData } from '@/lib/types';
 
@@ -29,21 +32,37 @@ interface ServerDetailClientProps {
   initialServer: ServerInfo | null;
 }
 
-const LINUX_TABS = ['CPU/RAM', 'Disk', 'Processes', 'Docker', 'GPU'];
-const MIKROTIK_TABS = ['Stats', 'Traffic', 'Domains', 'Hotspot'];
+function buildTabs(server: ServerInfo): string[] {
+  const tabs = ['CPU/RAM'];
+  if (server.type === 'mikrotik') {
+    if (server.features?.includes('traffic')) tabs.push('Traffic');
+    if (server.features?.includes('domains')) tabs.push('Domains');
+    if (server.features?.includes('hotspot')) tabs.push('Hotspot');
+    return tabs;
+  }
+  if (server.features?.includes('disk')) tabs.push('Disk');
+  if (server.features?.includes('processes')) tabs.push('Processes');
+  if (server.features?.includes('docker')) tabs.push('Docker');
+  if (server.features?.includes('gpu')) tabs.push('GPU');
+  return tabs;
+}
 
 export function ServerDetailClient({ serverId, initialServer }: ServerDetailClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [server, setServer] = useState<ServerInfo | null>(initialServer);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const { subscribe, unsubscribe } = useWebSocket();
 
   useEffect(() => {
     if (!initialServer) {
       fetch(`/api/servers/${serverId}`)
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
         .then((d) => setServer(d.server))
-        .catch(() => {});
+        .catch(() => setFetchError('Failed to load server details'));
     }
   }, [serverId, initialServer]);
 
@@ -63,6 +82,14 @@ export function ServerDetailClient({ serverId, initialServer }: ServerDetailClie
     return () => unsubscribe('overview', handleOverview);
   }, [subscribe, unsubscribe, handleOverview]);
 
+  if (fetchError) {
+    return (
+      <div className="flex items-center justify-center h-64 text-status-critical text-sm">
+        {fetchError}
+      </div>
+    );
+  }
+
   if (!server) {
     return (
       <div className="flex items-center justify-center h-64 text-text-muted">
@@ -71,7 +98,7 @@ export function ServerDetailClient({ serverId, initialServer }: ServerDetailClie
     );
   }
 
-  const tabs = server.type === 'mikrotik' ? MIKROTIK_TABS : LINUX_TABS;
+  const tabs = buildTabs(server);
   const isOnline = server.status === 'connected';
 
   return (
@@ -129,15 +156,30 @@ export function ServerDetailClient({ serverId, initialServer }: ServerDetailClie
           ))}
         </TabsList>
 
-        <TabsContent value={tabs[0]}>
+        <TabsContent value="CPU/RAM">
           <CpuRamChart serverId={serverId} />
         </TabsContent>
 
-        {tabs.slice(1).map((tab) => (
-          <TabsContent key={tab} value={tab}>
-            <PlaceholderTab name={tab} />
+        {tabs.includes('Disk') && (
+          <TabsContent value="Disk">
+            <DiskTable serverId={serverId} />
           </TabsContent>
-        ))}
+        )}
+        {tabs.includes('Processes') && (
+          <TabsContent value="Processes">
+            <ProcessTable serverId={serverId} serverType={server.type} />
+          </TabsContent>
+        )}
+        {tabs.includes('Docker') && (
+          <TabsContent value="Docker">
+            <DockerTable serverId={serverId} />
+          </TabsContent>
+        )}
+        {tabs.includes('GPU') && (
+          <TabsContent value="GPU">
+            <GpuStats serverId={serverId} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

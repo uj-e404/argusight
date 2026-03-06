@@ -1,4 +1,4 @@
-import type { DiskInfo, ProcessInfo, GpuInfo } from '../types';
+import type { DiskInfo, ProcessInfo, GpuInfo, GpuProcessInfo } from '../types';
 
 export function parseCpuWindows(raw: string): number {
   // Input from: Get-CimInstance Win32_Processor | Select-Object -ExpandProperty LoadPercentage
@@ -56,19 +56,29 @@ export function parseDiskWindows(raw: string): DiskInfo[] {
   }
 }
 
-export function parseProcessWindows(raw: string): ProcessInfo[] {
-  // Input from: Get-Process | Sort-Object CPU -Descending | Select-Object -First 20 ... | ConvertTo-Json
+export function parseProcessWindows(raw: string, logicalProcessors?: number): ProcessInfo[] {
+  // Input from: Get-CimInstance Win32_PerfFormattedData_PerfProc_Process | ConvertTo-Json
   try {
     const data = JSON.parse(raw);
     const procs = Array.isArray(data) ? data : [data];
-    return procs.map((p: Record<string, unknown>) => ({
-      pid: (p.Id as number) || 0,
-      user: '',
-      name: (p.ProcessName as string) || '',
-      cpu: Math.round(((p.CPU as number) || 0) * 100) / 100,
-      ram: 0,
-      memoryBytes: (p.WorkingSet64 as number) || 0,
-    }));
+    const cores = logicalProcessors && logicalProcessors > 0 ? logicalProcessors : 1;
+    return procs.map((p: Record<string, unknown>) => {
+      const memBytes = (p.WorkingSetPrivate as number) || (p.WorkingSet64 as number) || 0;
+      // Strip #N suffix from duplicate process names (e.g., "chrome#3" → "chrome")
+      const rawName = (p.Name as string) || (p.ProcessName as string) || '';
+      const name = rawName.replace(/#\d+$/, '');
+      const rawCpu = (p.PercentProcessorTime as number) ?? 0;
+      return {
+        pid: (p.IDProcess as number) || (p.Id as number) || 0,
+        user: '',
+        name,
+        // Normalize CPU% like Task Manager: divide by logical processor count
+        cpu: Math.round((rawCpu / cores) * 10) / 10,
+        // RAM in MB (converted from bytes)
+        ram: Math.round(memBytes / 1024 / 1024),
+        memoryBytes: memBytes,
+      };
+    });
   } catch {
     return [];
   }
@@ -88,4 +98,17 @@ export function parseGpuWindows(raw: string): GpuInfo | null {
     memTotal: parts[4],
     memUsed: parts[5],
   };
+}
+
+export function parseGpuProcessesWindows(raw: string): GpuProcessInfo[] {
+  // Same nvidia-smi format as Linux
+  const lines = raw.trim().split('\n').filter((l) => l.trim());
+  return lines.map((line) => {
+    const parts = line.split(',').map((s) => s.trim());
+    return {
+      pid: parseInt(parts[0], 10) || 0,
+      memoryUsed: parts[1]?.includes('N/A') ? null : (parseFloat(parts[1]) || 0),
+      name: parts[2] || '',
+    };
+  });
 }

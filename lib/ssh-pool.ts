@@ -361,4 +361,7 @@ class SSHPool {
 }
 
 export { SSHPool };
-export const sshPool = SSHPool.getInstance();
+
+// Use globalThis to ensure singleton persists across Next.js module reloads in dev mode
+const globalForSsh = globalThis as unknown as { __sshPool?: SSHPool };
+export const sshPool = globalForSsh.__sshPool ?? (globalForSsh.__sshPool = SSHPool.getInstance());

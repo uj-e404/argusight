@@ -55,6 +55,24 @@ app.prepare().then(async () => {
   // Track subscriptions: ws → Set<channel>
   const subscriptions = new Map<WebSocket, Set<string>>();
 
+  // Ping/pong heartbeat: detect and terminate stale connections
+  const alive = new Map<WebSocket, boolean>();
+  const heartbeatInterval = setInterval(() => {
+    for (const [ws] of subscriptions) {
+      if (alive.get(ws) === false) {
+        // No pong received since last ping — connection is stale
+        console.log('[ws] Terminating stale connection');
+        alive.delete(ws);
+        subscriptions.delete(ws);
+        wsRateLimit.delete(ws);
+        ws.terminate();
+        continue;
+      }
+      alive.set(ws, false);
+      ws.ping();
+    }
+  }, 30_000);
+
   server.on('upgrade', async (req, socket, head) => {
     const { pathname } = new URL(req.url || '/', `http://${req.headers.host}`);
 
@@ -96,6 +114,11 @@ app.prepare().then(async () => {
   wss.on('connection', (ws) => {
     subscriptions.set(ws, new Set());
     wsRateLimit.set(ws, { count: 0, resetTime: Date.now() + 1000 });
+    alive.set(ws, true);
+
+    ws.on('pong', () => {
+      alive.set(ws, true);
+    });
 
     ws.on('message', (raw) => {
       try {
@@ -150,6 +173,7 @@ app.prepare().then(async () => {
     ws.on('close', () => {
       subscriptions.delete(ws);
       wsRateLimit.delete(ws);
+      alive.delete(ws);
     });
   });
 
@@ -193,6 +217,7 @@ app.prepare().then(async () => {
   // Graceful shutdown
   const shutdown = () => {
     console.log('[server] Shutting down...');
+    clearInterval(heartbeatInterval);
     stopMetricCollector();
     sshPool.disconnectAll();
     wss.clients.forEach((ws) => ws.close());
