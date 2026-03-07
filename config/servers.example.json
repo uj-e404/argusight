@@ -31,7 +31,7 @@
       "specs": {
         "model": "RB4011"
       },
-      "features": ["cpu", "ram", "traffic", "domains"],
+      "features": ["cpu", "ram", "traffic", "domains", "network"],
       "tags": ["network"]
     },
     {

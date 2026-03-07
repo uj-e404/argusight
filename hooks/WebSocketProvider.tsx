@@ -8,6 +8,7 @@ type ReconnectCallback = () => void;
 interface WebSocketContextValue {
   subscribe: (channel: string, callback: MessageCallback) => void;
   unsubscribe: (channel: string, callback: MessageCallback) => void;
+  send: (msg: Record<string, unknown>) => void;
   onReconnect: (cb: ReconnectCallback) => void;
   offReconnect: (cb: ReconnectCallback) => void;
   isConnected: boolean;
@@ -77,6 +78,24 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
           const cbs = callbacksRef.current.get(channel);
           cbs?.forEach((cb) => cb(msg));
         }
+        // For traffic messages (server:{id}:traffic)
+        if (msg.type === 'traffic' && msg.serverId) {
+          const channel = `server:${msg.serverId}:traffic`;
+          const cbs = callbacksRef.current.get(channel);
+          cbs?.forEach((cb) => cb(msg));
+        }
+        // For hotspot messages (server:{id}:hotspot)
+        if (msg.type === 'hotspot' && msg.serverId) {
+          const channel = `server:${msg.serverId}:hotspot`;
+          const cbs = callbacksRef.current.get(channel);
+          cbs?.forEach((cb) => cb(msg));
+        }
+        // For network messages (server:{id}:network)
+        if (msg.type === 'network' && msg.serverId) {
+          const channel = `server:${msg.serverId}:network`;
+          const cbs = callbacksRef.current.get(channel);
+          cbs?.forEach((cb) => cb(msg));
+        }
       } catch {
         // ignore malformed messages
       }
@@ -142,6 +161,12 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const send = useCallback((msg: Record<string, unknown>) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(msg));
+    }
+  }, []);
+
   const onReconnect = useCallback((cb: ReconnectCallback) => {
     reconnectCallbacksRef.current.add(cb);
   }, []);
@@ -151,7 +176,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <WebSocketContext.Provider value={{ subscribe, unsubscribe, onReconnect, offReconnect, isConnected }}>
+    <WebSocketContext.Provider value={{ subscribe, unsubscribe, send, onReconnect, offReconnect, isConnected }}>
       {children}
     </WebSocketContext.Provider>
   );

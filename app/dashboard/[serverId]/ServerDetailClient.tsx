@@ -12,6 +12,10 @@ import { DiskTable } from './components/DiskTable';
 import { ProcessTable } from './components/ProcessTable';
 import { DockerTable } from './components/DockerTable';
 import { GpuStats } from './components/GpuStats';
+import { TrafficChart } from './components/TrafficChart';
+import { DomainTable } from './components/DomainTable';
+import { HotspotTable } from './components/HotspotTable';
+import { NetworkTable } from './components/NetworkTable';
 import { useWebSocket } from '@/hooks/WebSocketProvider';
 import type { OverviewServerData } from '@/lib/types';
 
@@ -38,6 +42,7 @@ function buildTabs(server: ServerInfo): string[] {
     if (server.features?.includes('traffic')) tabs.push('Traffic');
     if (server.features?.includes('domains')) tabs.push('Domains');
     if (server.features?.includes('hotspot')) tabs.push('Hotspot');
+    if (server.features?.includes('network')) tabs.push('Network');
     return tabs;
   }
   if (server.features?.includes('disk')) tabs.push('Disk');
@@ -178,6 +183,26 @@ export function ServerDetailClient({ serverId, initialServer }: ServerDetailClie
         {tabs.includes('GPU') && (
           <TabsContent value="GPU">
             <GpuStats serverId={serverId} />
+          </TabsContent>
+        )}
+        {tabs.includes('Traffic') && (
+          <TabsContent value="Traffic">
+            <TrafficChart serverId={serverId} />
+          </TabsContent>
+        )}
+        {tabs.includes('Domains') && (
+          <TabsContent value="Domains">
+            <DomainTable serverId={serverId} />
+          </TabsContent>
+        )}
+        {tabs.includes('Hotspot') && (
+          <TabsContent value="Hotspot">
+            <HotspotTable serverId={serverId} />
+          </TabsContent>
+        )}
+        {tabs.includes('Network') && (
+          <TabsContent value="Network">
+            <NetworkTable serverId={serverId} />
           </TabsContent>
         )}
       </Tabs>

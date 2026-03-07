@@ -40,13 +40,14 @@ export interface SSHConnectionState {
 }
 
 export interface ClientMessage {
-  type: 'subscribe' | 'unsubscribe';
+  type: 'subscribe' | 'unsubscribe' | 'set-interface';
   channel: string;
   serverId?: string;
+  interface?: string;
 }
 
 export interface ServerMessage {
-  type: 'overview' | 'stats' | 'traffic' | 'hotspot' | 'error';
+  type: 'overview' | 'stats' | 'traffic' | 'hotspot' | 'network' | 'error';
   serverId?: string;
   data: unknown;
   timestamp: string;
@@ -107,6 +108,36 @@ export interface DiskSmartStatus {
   healthy: boolean;
   status: string;
 }
+
+export interface TrafficPoint {
+  timestamp: string;
+  interface: string;
+  rxBps: number;
+  txBps: number;
+}
+
+export interface DomainTrafficEntry {
+  name: string;
+  address: string;
+  connections: number;
+}
+
+export interface NetworkClient {
+  ip: string;
+  mac: string;
+  hostname: string;
+  label: string;
+  bytesIn: number;
+  bytesOut: number;
+  rateIn: number;
+  rateOut: number;
+  connections: number;
+  topDestinations: { ip: string; domain?: string; connections: number }[];
+  /** Internal: true if bytesIn/bytesOut are cumulative (queue stats), false if per-interval (accounting snapshot) */
+  _bytesCumulative?: boolean;
+}
+
+export type { MikroTikHotspotUser, MikroTikInterface } from './parsers/mikrotik';
 
 export interface OverviewServerData {
   serverId: string;

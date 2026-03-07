@@ -4,20 +4,34 @@ import { broadcast } from './broadcast';
 import { readServersConfig } from './config-writer';
 import { parseCpuStatDelta, parseMemory, parseDiskUsage, parseUptime } from './parsers/linux';
 import { parseCpuWindows, parseMemoryWindows, parseDiskWindows } from './parsers/windows';
-import { parseMikroTikResource } from './parsers/mikrotik';
-import type { ServerConfig, OverviewServerData, CpuRamData } from './types';
+import { parseMikroTikResource, parseMikroTikTraffic, parseMikroTikHotspotDetail, parseMikroTikHotspotStats } from './parsers/mikrotik';
+import { collectNetworkData, clearDestAccumulator } from './network-collector';
+import type { ServerConfig, OverviewServerData, CpuRamData, TrafficPoint, MikroTikHotspotUser, NetworkClient } from './types';
 
 const OVERVIEW_INTERVAL = 5000;
 const DETAIL_INTERVAL = 2000;
+const TRAFFIC_INTERVAL = 1000;
+const HOTSPOT_INTERVAL = 2000;
+const NETWORK_INTERVAL = 5000;
 const RING_BUFFER_MAX = 150;
+const TRAFFIC_BUFFER_MAX = 120;
 
 let overviewTimer: ReturnType<typeof setInterval> | null = null;
 let detailTimer: ReturnType<typeof setInterval> | null = null;
+let trafficTimer: ReturnType<typeof setInterval> | null = null;
+let hotspotTimer: ReturnType<typeof setInterval> | null = null;
+let networkTimer: ReturnType<typeof setInterval> | null = null;
 
 const latestOverview = new Map<string, OverviewServerData>();
 const ringBuffers = new Map<string, CpuRamData[]>();
+const trafficBuffers = new Map<string, TrafficPoint[]>();
+const hotspotCache = new Map<string, { users: MikroTikHotspotUser[]; totalBytesIn: number; totalBytesOut: number; totalRateIn: number; totalRateOut: number }>();
+const networkCache = new Map<string, NetworkClient[]>();
+const previousNetworkSnapshot = new Map<string, Map<string, { bytesIn: number; bytesOut: number; timestamp: number }>>();
+const previousHotspotSnapshot = new Map<string, Map<string, { bytesIn: number; bytesOut: number; timestamp: number }>>();
 
 let getSubscribersFn: (() => Map<WebSocket, Set<string>>) | null = null;
+let getInterfaceSelectionFn: ((serverId: string) => string | undefined) | null = null;
 let serverConfigs: ServerConfig[] = [];
 
 function syncConfigFromDisk() {
@@ -31,7 +45,6 @@ function syncConfigFromDisk() {
       if (!memoryIds.has(s.id)) {
         serverConfigs.push(s);
         sshPool.connect(s);
-        console.debug(`[metrics] Auto-added server: ${s.name}`);
       }
     }
 
@@ -43,7 +56,6 @@ function syncConfigFromDisk() {
         sshPool.removeConfig(removed.id);
         latestOverview.delete(removed.id);
         ringBuffers.delete(removed.id);
-        console.debug(`[metrics] Auto-removed server: ${removed.name}`);
       }
     }
 
@@ -55,7 +67,6 @@ function syncConfigFromDisk() {
         sshPool.removeConfig(s.id);
         sshPool.connect(s);
         ringBuffers.delete(s.id);
-        console.debug(`[metrics] Auto-updated server: ${s.name}`);
       }
     }
   } catch {
@@ -213,12 +224,213 @@ async function pollDetail() {
   }));
 }
 
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function getActiveChannelServers(suffix: string): string[] {
+  if (!getSubscribersFn) return [];
+  const subs = getSubscribersFn();
+  const activeIds = new Set<string>();
+  const pattern = new RegExp(`^server:([^:]+):${escapeRegex(suffix)}$`);
+  for (const [, channels] of subs) {
+    for (const ch of channels) {
+      const match = ch.match(pattern);
+      if (match) activeIds.add(match[1]);
+    }
+  }
+  return [...activeIds];
+}
+
+async function pollTraffic() {
+  const activeIds = getActiveChannelServers('traffic');
+  if (activeIds.length === 0) return;
+
+  await Promise.all(activeIds.map(async (serverId) => {
+    const config = serverConfigs.find((s) => s.id === serverId);
+    if (!config || config.type !== 'mikrotik') return;
+
+    const state = sshPool.getStatus(serverId);
+    if (state?.status !== 'connected') return;
+
+    const iface = getInterfaceSelectionFn?.(serverId);
+    if (!iface) return;
+
+    try {
+      const raw = await sshPool.exec(serverId, `/interface monitor-traffic ${iface} once`);
+      const parsed = parseMikroTikTraffic(raw);
+
+      const point: TrafficPoint = {
+        timestamp: new Date().toISOString(),
+        interface: iface,
+        rxBps: parsed.rxBps,
+        txBps: parsed.txBps,
+      };
+
+      let buffer = trafficBuffers.get(serverId);
+      if (!buffer) {
+        buffer = [];
+        trafficBuffers.set(serverId, buffer);
+      }
+      buffer.push(point);
+      if (buffer.length > TRAFFIC_BUFFER_MAX) {
+        buffer.splice(0, buffer.length - TRAFFIC_BUFFER_MAX);
+      }
+
+      broadcast(`server:${serverId}:traffic`, point);
+    } catch (err) {
+      console.warn(`[metrics] Traffic poll failed for ${serverId}:`, (err as Error).message);
+    }
+  }));
+}
+
+async function pollHotspot() {
+  const activeIds = getActiveChannelServers('hotspot');
+  if (activeIds.length === 0) return;
+
+  await Promise.all(activeIds.map(async (serverId) => {
+    const config = serverConfigs.find((s) => s.id === serverId);
+    if (!config || config.type !== 'mikrotik') return;
+
+    const state = sshPool.getStatus(serverId);
+    if (state?.status !== 'connected') return;
+
+    try {
+      // Single atomic command: detail + stats separated by marker
+      const combined = await sshPool.exec(
+        serverId,
+        '/ip hotspot active print detail without-paging; :put "===HOTSPOT_STATS==="; /ip hotspot active print stats without-paging'
+      );
+      const sepIdx = combined.indexOf('===HOTSPOT_STATS===');
+      const detailRaw = sepIdx >= 0 ? combined.substring(0, sepIdx) : combined;
+      const statsRaw = sepIdx >= 0 ? combined.substring(sepIdx + '===HOTSPOT_STATS==='.length) : '';
+
+      const users = parseMikroTikHotspotDetail(detailRaw);
+      const statsMap = parseMikroTikHotspotStats(statsRaw);
+
+      // Merge bytes from stats into detail by index (atomic snapshot, indexes match)
+      for (let i = 0; i < users.length; i++) {
+        if (users[i].bytesIn === 0 && users[i].bytesOut === 0) {
+          const stats = statsMap.get(i);
+          if (stats) {
+            users[i].bytesIn = stats.bytesIn;
+            users[i].bytesOut = stats.bytesOut;
+          }
+        }
+      }
+
+      const now = Date.now();
+      const prevSnapshot = previousHotspotSnapshot.get(serverId);
+      const newSnapshot = new Map<string, { bytesIn: number; bytesOut: number; timestamp: number }>();
+
+      for (const user of users) {
+        const key = user.user + user.macAddress;
+        const prev = prevSnapshot?.get(key);
+        if (prev) {
+          const deltaSec = (now - prev.timestamp) / 1000;
+          if (deltaSec > 0) {
+            const deltaIn = user.bytesIn - prev.bytesIn;
+            const deltaOut = user.bytesOut - prev.bytesOut;
+            user.rateIn = deltaIn >= 0 ? deltaIn / deltaSec : 0;
+            user.rateOut = deltaOut >= 0 ? deltaOut / deltaSec : 0;
+          }
+        }
+        newSnapshot.set(key, { bytesIn: user.bytesIn, bytesOut: user.bytesOut, timestamp: now });
+      }
+
+      previousHotspotSnapshot.set(serverId, newSnapshot);
+
+      const totalBytesIn = users.reduce((sum, u) => sum + u.bytesIn, 0);
+      const totalBytesOut = users.reduce((sum, u) => sum + u.bytesOut, 0);
+      const totalRateIn = users.reduce((sum, u) => sum + u.rateIn, 0);
+      const totalRateOut = users.reduce((sum, u) => sum + u.rateOut, 0);
+
+      const data = { users, totalBytesIn, totalBytesOut, totalRateIn, totalRateOut };
+      hotspotCache.set(serverId, data);
+      broadcast(`server:${serverId}:hotspot`, data);
+    } catch (err) {
+      console.warn(`[metrics] Hotspot poll failed for ${serverId}:`, (err as Error).message);
+    }
+  }));
+}
+
+async function pollNetwork() {
+  const activeIds = getActiveChannelServers('network');
+  if (activeIds.length === 0) return;
+
+  await Promise.all(activeIds.map(async (serverId) => {
+    const config = serverConfigs.find((s) => s.id === serverId);
+    if (!config || config.type !== 'mikrotik') return;
+
+    const state = sshPool.getStatus(serverId);
+    if (state?.status !== 'connected') return;
+
+    try {
+      const clients = await collectNetworkData(serverId);
+      const now = Date.now();
+      const prevSnapshot = previousNetworkSnapshot.get(serverId);
+      const newSnapshot = new Map<string, { bytesIn: number; bytesOut: number; timestamp: number }>();
+
+      for (const client of clients) {
+        if (client._bytesCumulative) {
+          // Queue stats: cumulative bytes — use delta between polls
+          const prev = prevSnapshot?.get(client.ip);
+          if (prev) {
+            const deltaSec = (now - prev.timestamp) / 1000;
+            if (deltaSec > 0) {
+              const deltaIn = client.bytesIn - prev.bytesIn;
+              const deltaOut = client.bytesOut - prev.bytesOut;
+              // Handle counter resets (router reboot / wrap)
+              client.rateIn = deltaIn >= 0 ? deltaIn / deltaSec : 0;
+              client.rateOut = deltaOut >= 0 ? deltaOut / deltaSec : 0;
+            }
+          }
+          newSnapshot.set(client.ip, { bytesIn: client.bytesIn, bytesOut: client.bytesOut, timestamp: now });
+        } else if (client.bytesIn > 0 || client.bytesOut > 0) {
+          // Accounting/connection tracking: per-interval bytes — divide by poll interval
+          const prev = prevSnapshot?.get(client.ip);
+          const deltaSec = prev ? (now - prev.timestamp) / 1000 : NETWORK_INTERVAL / 1000;
+          if (deltaSec > 0) {
+            client.rateIn = client.bytesIn / deltaSec;
+            client.rateOut = client.bytesOut / deltaSec;
+          }
+          newSnapshot.set(client.ip, { bytesIn: 0, bytesOut: 0, timestamp: now });
+        }
+      }
+
+      previousNetworkSnapshot.set(serverId, newSnapshot);
+      networkCache.set(serverId, clients);
+      broadcast(`server:${serverId}:network`, { clients });
+    } catch (err) {
+      console.warn(`[metrics] Network poll failed for ${serverId}:`, (err as Error).message);
+    }
+  }));
+}
+
+export function getNetworkCache(serverId: string): NetworkClient[] | null {
+  return networkCache.get(serverId) || null;
+}
+
+export function getTrafficBuffer(serverId: string): TrafficPoint[] {
+  return trafficBuffers.get(serverId) || [];
+}
+
+export function getHotspotCache(serverId: string) {
+  return hotspotCache.get(serverId) || null;
+}
+
+export function clearTrafficBuffer(serverId: string) {
+  trafficBuffers.delete(serverId);
+}
+
 export function startMetricCollector(
   getSubscribers: () => Map<WebSocket, Set<string>>,
-  servers: ServerConfig[]
+  servers: ServerConfig[],
+  getInterfaceSelection?: (serverId: string) => string | undefined
 ) {
   getSubscribersFn = getSubscribers;
   serverConfigs = servers;
+  if (getInterfaceSelection) getInterfaceSelectionFn = getInterfaceSelection;
 
   console.log(`[metrics] Starting collector for ${servers.length} server(s)`);
 
@@ -227,17 +439,17 @@ export function startMetricCollector(
 
   overviewTimer = setInterval(pollOverview, OVERVIEW_INTERVAL);
   detailTimer = setInterval(pollDetail, DETAIL_INTERVAL);
+  trafficTimer = setInterval(pollTraffic, TRAFFIC_INTERVAL);
+  hotspotTimer = setInterval(pollHotspot, HOTSPOT_INTERVAL);
+  networkTimer = setInterval(pollNetwork, NETWORK_INTERVAL);
 }
 
 export function stopMetricCollector() {
-  if (overviewTimer) {
-    clearInterval(overviewTimer);
-    overviewTimer = null;
-  }
-  if (detailTimer) {
-    clearInterval(detailTimer);
-    detailTimer = null;
-  }
+  if (overviewTimer) { clearInterval(overviewTimer); overviewTimer = null; }
+  if (detailTimer) { clearInterval(detailTimer); detailTimer = null; }
+  if (trafficTimer) { clearInterval(trafficTimer); trafficTimer = null; }
+  if (hotspotTimer) { clearInterval(hotspotTimer); hotspotTimer = null; }
+  if (networkTimer) { clearInterval(networkTimer); networkTimer = null; }
   console.log('[metrics] Collector stopped');
 }
 
@@ -260,6 +472,12 @@ export function removeServerFromCollector(serverId: string) {
   if (idx !== -1) serverConfigs.splice(idx, 1);
   latestOverview.delete(serverId);
   ringBuffers.delete(serverId);
+  trafficBuffers.delete(serverId);
+  hotspotCache.delete(serverId);
+  networkCache.delete(serverId);
+  previousNetworkSnapshot.delete(serverId);
+  previousHotspotSnapshot.delete(serverId);
+  clearDestAccumulator(serverId);
 }
 
 export function updateServerInCollector(config: ServerConfig) {

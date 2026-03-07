@@ -6,7 +6,7 @@ import { join } from 'path';
 import { jwtVerify } from 'jose';
 import { sshPool } from './lib/ssh-pool';
 import { setBroadcast } from './lib/broadcast';
-import { startMetricCollector, stopMetricCollector, getRingBuffer } from './lib/metric-collector';
+import { startMetricCollector, stopMetricCollector, getRingBuffer, getTrafficBuffer, getHotspotCache, getNetworkCache, clearTrafficBuffer } from './lib/metric-collector';
 import type { ServersConfig, AuthConfig, ClientMessage } from './lib/types';
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -54,6 +54,8 @@ app.prepare().then(async () => {
 
   // Track subscriptions: ws → Set<channel>
   const subscriptions = new Map<WebSocket, Set<string>>();
+  // Track interface selection per server for traffic monitoring
+  const interfaceSelection = new Map<string, string>();
 
   // Ping/pong heartbeat: detect and terminate stale connections
   const alive = new Map<WebSocket, boolean>();
@@ -137,6 +139,15 @@ app.prepare().then(async () => {
         const msg: ClientMessage = JSON.parse(raw.toString());
         const subs = subscriptions.get(ws)!;
 
+        // Handle set-interface before channel validation (no channel needed)
+        if (msg.type === 'set-interface') {
+          if (msg.serverId && msg.interface && /^[a-zA-Z0-9._-]+$/.test(msg.interface)) {
+            interfaceSelection.set(msg.serverId, msg.interface);
+            clearTrafficBuffer(msg.serverId);
+          }
+          return;
+        }
+
         // Validate channel name
         if (!msg.channel || msg.channel.length > WS_MAX_CHANNEL_LENGTH || !WS_CHANNEL_REGEX.test(msg.channel)) {
           return;
@@ -157,6 +168,51 @@ app.prepare().then(async () => {
                 type: 'stats',
                 serverId,
                 data: buffer,
+                timestamp: new Date().toISOString(),
+                backfill: true,
+              }));
+            }
+          }
+
+          // Send backfill for traffic channels
+          if (msg.channel.endsWith(':traffic')) {
+            const serverId = msg.channel.split(':')[1];
+            const buffer = getTrafficBuffer(serverId);
+            if (buffer.length > 0) {
+              ws.send(JSON.stringify({
+                type: 'traffic',
+                serverId,
+                data: buffer,
+                timestamp: new Date().toISOString(),
+                backfill: true,
+              }));
+            }
+          }
+
+          // Send cache for hotspot channels
+          if (msg.channel.endsWith(':hotspot')) {
+            const serverId = msg.channel.split(':')[1];
+            const cached = getHotspotCache(serverId);
+            if (cached) {
+              ws.send(JSON.stringify({
+                type: 'hotspot',
+                serverId,
+                data: cached,
+                timestamp: new Date().toISOString(),
+                backfill: true,
+              }));
+            }
+          }
+
+          // Send cache for network channels
+          if (msg.channel.endsWith(':network')) {
+            const serverId = msg.channel.split(':')[1];
+            const cached = getNetworkCache(serverId);
+            if (cached) {
+              ws.send(JSON.stringify({
+                type: 'network',
+                serverId,
+                data: { clients: cached },
                 timestamp: new Date().toISOString(),
                 backfill: true,
               }));
@@ -203,7 +259,11 @@ app.prepare().then(async () => {
   setBroadcast(broadcast);
 
   // Always start metric collector (supports dynamic add/remove)
-  startMetricCollector(() => subscriptions, serversConfig.servers);
+  startMetricCollector(
+    () => subscriptions,
+    serversConfig.servers,
+    (serverId: string) => interfaceSelection.get(serverId)
+  );
 
   // Connect to SSH servers
   if (serversConfig.servers.length > 0) {
