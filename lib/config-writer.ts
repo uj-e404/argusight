@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, renameSync, existsSync } from 'fs';
 import { join } from 'path';
+import { logger } from './logger';
 import type { ServersConfig } from './types';
 
 const configPath = process.env.CONFIG_PATH || join(process.cwd(), 'config');
@@ -14,7 +15,7 @@ export function readServersConfig(): ServersConfig {
   try {
     return JSON.parse(readFileSync(serversPath, 'utf-8'));
   } catch (err) {
-    console.error('[config] Failed to parse servers.json (file may be corrupt):', err);
+    logger.error('config', 'Failed to parse servers.json (file may be corrupt)', { error: String(err) });
     return { servers: [] };
   }
 }

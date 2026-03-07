@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useServerNetwork } from '@/hooks/useServerNetwork';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 import type { NetworkClient } from '@/lib/types';
 
 interface NetworkTableProps {
@@ -103,13 +104,7 @@ export function NetworkTable({ serverId }: NetworkTableProps) {
   const totalRateOut = clients.reduce((sum, c) => sum + c.rateOut, 0);
 
   if (loading && clients.length === 0) {
-    return (
-      <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
-        <div className="flex items-center justify-center h-40 text-text-muted text-sm">
-          Waiting for network data...
-        </div>
-      </div>
-    );
+    return <TableSkeleton columns={6} />;
   }
 
   const SortHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
@@ -180,7 +175,10 @@ export function NetworkTable({ serverId }: NetworkTableProps) {
               {filtered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-text-muted text-sm py-8">
-                    {search ? 'No matching clients' : 'No network data available'}
+                    <div className="flex flex-col items-center">
+                      <Network className="h-10 w-10 text-text-muted/30 mb-2" />
+                      {search ? 'No matching clients' : 'No network data available'}
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (

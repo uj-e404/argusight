@@ -11,6 +11,7 @@ interface NetworkData {
 export function useServerNetwork(serverId: string) {
   const [clients, setClients] = useState<NetworkClient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const { subscribe, unsubscribe, onReconnect, offReconnect } = useWebSocket();
 
   const handleNetwork = useCallback((msg: unknown) => {
@@ -18,6 +19,7 @@ export function useServerNetwork(serverId: string) {
     if (m.data?.clients) {
       setClients(m.data.clients);
       setLoading(false);
+      setLastUpdated(new Date());
     }
   }, []);
 
@@ -35,5 +37,5 @@ export function useServerNetwork(serverId: string) {
     return () => offReconnect(handleReconnect);
   }, [onReconnect, offReconnect]);
 
-  return { clients, loading };
+  return { clients, loading, lastUpdated };
 }

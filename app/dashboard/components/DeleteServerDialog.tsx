@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface DeleteServerDialogProps {
   open: boolean;
@@ -37,12 +38,16 @@ export function DeleteServerDialog({ open, onOpenChange, server, onSuccess }: De
       if (res.ok) {
         onOpenChange(false);
         onSuccess();
+        toast.success(`${server.name} deleted`);
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || 'Failed to delete server');
+        const msg = data.error || 'Failed to delete server';
+        setError(msg);
+        toast.error(msg);
       }
     } catch {
       setError('Network error — could not reach server');
+      toast.error('Network error');
     } finally {
       setIsDeleting(false);
     }

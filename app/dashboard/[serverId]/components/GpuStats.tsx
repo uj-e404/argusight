@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/table';
 import { StatusBar } from './StatusProgress';
 import { usePolling } from './usePolling';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { GpuInfo, GpuProcessInfo } from '@/lib/types';
 
 interface GpuResponse {
@@ -33,10 +34,14 @@ export function GpuStats({ serverId }: GpuStatsProps) {
 
   if (!data && !error) {
     return (
-      <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
-        <div className="flex items-center justify-center h-40 text-text-muted text-sm">
-          Loading GPU information...
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="bg-bg-surface border border-bg-elevated rounded-lg p-4">
+            <Skeleton className="h-3 w-20 bg-bg-elevated mb-3" />
+            <Skeleton className="h-8 w-16 bg-bg-elevated mb-2" />
+            <Skeleton className="h-2 w-full bg-bg-elevated" />
+          </div>
+        ))}
       </div>
     );
   }

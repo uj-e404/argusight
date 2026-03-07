@@ -19,6 +19,7 @@ export function useServerHotspot(serverId: string) {
   const [totalRateIn, setTotalRateIn] = useState(0);
   const [totalRateOut, setTotalRateOut] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const { subscribe, unsubscribe, onReconnect, offReconnect } = useWebSocket();
 
   const handleHotspot = useCallback((msg: unknown) => {
@@ -30,6 +31,7 @@ export function useServerHotspot(serverId: string) {
       setTotalRateIn(m.data.totalRateIn || 0);
       setTotalRateOut(m.data.totalRateOut || 0);
       setLoading(false);
+      setLastUpdated(new Date());
     }
   }, []);
 
@@ -47,5 +49,5 @@ export function useServerHotspot(serverId: string) {
     return () => offReconnect(handleReconnect);
   }, [onReconnect, offReconnect]);
 
-  return { users, totalBytesIn, totalBytesOut, totalRateIn, totalRateOut, loading };
+  return { users, totalBytesIn, totalBytesOut, totalRateIn, totalRateOut, loading, lastUpdated };
 }

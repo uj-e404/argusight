@@ -1,5 +1,6 @@
 import { Client } from 'ssh2';
 import { readFileSync } from 'fs';
+import { logger } from './logger';
 import type { ServerConfig, SSHConnectionState } from './types';
 
 const BACKOFF_SCHEDULE = [5000, 10000, 30000, 60000]; // ms
@@ -58,7 +59,7 @@ function resolvePassword(password: string): string | undefined {
     const envVar = password.slice(ENV_PREFIX.length);
     const value = process.env[envVar];
     if (!value) {
-      console.warn(`[ssh] Environment variable "${envVar}" is not set (referenced in password field)`);
+      logger.warn('ssh', `Environment variable "${envVar}" is not set (referenced in password field)`);
     }
     return value;
   }
@@ -94,7 +95,7 @@ class SSHPool {
       const client = new Client();
 
       client.on('ready', () => {
-        console.log(`[ssh] Connected: ${config.name} (${config.host})`);
+        logger.info('ssh', `Connected: ${config.name} (${config.host})`);
         this.connections.set(config.id, client);
         this.setState(config.id, {
           status: 'connected',
@@ -106,7 +107,7 @@ class SSHPool {
       });
 
       client.on('error', (err) => {
-        console.error(`[ssh] Error on ${config.name}: ${err.message}`);
+        logger.error('ssh', `Error on ${config.name}: ${err.message}`);
         this.setState(config.id, {
           status: 'error',
           lastError: err.message,
@@ -115,7 +116,7 @@ class SSHPool {
       });
 
       client.on('close', () => {
-        console.log(`[ssh] Disconnected: ${config.name}`);
+        logger.info('ssh', `Disconnected: ${config.name}`);
         this.connections.delete(config.id);
         const state = this.states.get(config.id);
         if (state && state.status !== 'disconnected') {
@@ -141,7 +142,7 @@ class SSHPool {
         try {
           connectConfig.privateKey = readFileSync(config.privateKeyPath);
         } catch (err) {
-          console.error(`[ssh] Failed to read key for ${config.name}: ${err}`);
+          logger.error('ssh', `Failed to read key for ${config.name}`, { error: String(err) });
           this.setState(config.id, {
             status: 'error',
             lastError: `Key file not found: ${config.privateKeyPath}`,
@@ -167,10 +168,10 @@ class SSHPool {
   }
 
   async connectAll(servers: ServerConfig[]): Promise<void> {
-    console.log(`[ssh] Connecting to ${servers.length} server(s)...`);
+    logger.info('ssh', `Connecting to ${servers.length} server(s)...`);
     await Promise.all(servers.map((s) => this.connect(s)));
     const connected = [...this.states.values()].filter((s) => s.status === 'connected').length;
-    console.log(`[ssh] ${connected}/${servers.length} connected`);
+    logger.info('ssh', `${connected}/${servers.length} connected`);
   }
 
   exec(serverId: string, command: string, timeout = 10000): Promise<string> {
@@ -313,7 +314,7 @@ class SSHPool {
     const attempt = state.reconnectAttempts;
 
     if (attempt >= MAX_RECONNECT_ATTEMPTS) {
-      console.warn(`[ssh] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached for ${config.name}. Giving up.`);
+      logger.warn('ssh', `Max reconnect attempts reached for ${config.name}`, { attempts: MAX_RECONNECT_ATTEMPTS });
       this.setState(serverId, {
         status: 'error',
         lastError: `Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached`,
@@ -323,7 +324,7 @@ class SSHPool {
 
     const delay = BACKOFF_SCHEDULE[Math.min(attempt, BACKOFF_SCHEDULE.length - 1)];
 
-    console.log(`[ssh] Reconnecting ${config.name} in ${delay / 1000}s (attempt ${attempt + 1}/${MAX_RECONNECT_ATTEMPTS})`);
+    logger.info('ssh', `Reconnecting ${config.name} in ${delay / 1000}s`, { attempt: attempt + 1, maxAttempts: MAX_RECONNECT_ATTEMPTS });
 
     this.setState(serverId, { reconnectAttempts: attempt + 1 });
 

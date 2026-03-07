@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { Activity } from 'lucide-react';
 import { useServerStats } from '@/hooks/useServerStats';
 import {
   ResponsiveContainer,
@@ -75,7 +76,8 @@ export function CpuRamChart({ serverId }: CpuRamChartProps) {
       {/* Chart */}
       <div className="h-[300px]">
         {chartData.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-text-muted text-sm">
+          <div className="flex flex-col items-center justify-center h-full text-text-muted text-sm">
+            <Activity className="h-10 w-10 text-text-muted/30 mb-2" />
             {loading ? 'Waiting for data...' : 'No data available'}
           </div>
         ) : (

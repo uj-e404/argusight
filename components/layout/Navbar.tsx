@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Menu, LogOut } from 'lucide-react';
+import { Menu, LogOut, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useWebSocket } from '@/hooks/WebSocketProvider';
+import { toast } from 'sonner';
 
 interface NavbarProps {
   onMenuToggle: () => void;
@@ -11,7 +13,15 @@ interface NavbarProps {
 
 export function Navbar({ onMenuToggle }: NavbarProps) {
   const router = useRouter();
-  const { isConnected } = useWebSocket();
+  const { isConnected, reconnect } = useWebSocket();
+  const [reconnecting, setReconnecting] = useState(false);
+
+  const handleReconnect = () => {
+    reconnect();
+    toast.info('Reconnecting...');
+    setReconnecting(true);
+    setTimeout(() => setReconnecting(false), 3000);
+  };
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -47,6 +57,17 @@ export function Navbar({ onMenuToggle }: NavbarProps) {
           <span className="text-xs font-mono text-text-muted hidden sm:inline">
             {isConnected ? 'Live' : 'Offline'}
           </span>
+          {!isConnected && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleReconnect}
+              disabled={reconnecting}
+              className="h-7 w-7 text-text-muted hover:text-text-primary"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${reconnecting ? 'animate-spin' : ''}`} />
+            </Button>
+          )}
         </div>
         <Button
           variant="ghost"

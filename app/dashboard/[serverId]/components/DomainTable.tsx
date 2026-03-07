@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, ArrowUpDown } from 'lucide-react';
+import { Search, ArrowUpDown, Globe } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -21,6 +21,7 @@ import {
   Tooltip,
 } from 'recharts';
 import { usePolling } from './usePolling';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 import type { DomainTrafficEntry } from '@/lib/types';
 
 interface DomainTableProps {
@@ -80,13 +81,7 @@ export function DomainTable({ serverId }: DomainTableProps) {
   };
 
   if (!data && !error) {
-    return (
-      <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
-        <div className="flex items-center justify-center h-40 text-text-muted text-sm">
-          Loading domains...
-        </div>
-      </div>
-    );
+    return <TableSkeleton columns={3} />;
   }
 
   if (error && !data) {
@@ -178,7 +173,10 @@ export function DomainTable({ serverId }: DomainTableProps) {
               {filtered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center text-text-muted text-sm py-8">
-                    {search ? 'No matching domains' : 'No domain data available'}
+                    <div className="flex flex-col items-center">
+                      <Globe className="h-10 w-10 text-text-muted/30 mb-2" />
+                      {search ? 'No matching domains' : 'No domain data available'}
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (

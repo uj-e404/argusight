@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, CheckCircle2, XCircle, Wifi, ShieldAlert } from 'lucide-react';
+import { toast } from 'sonner';
 
 type ServerType = 'linux' | 'windows' | 'mikrotik';
 type AuthType = 'password' | 'key';
@@ -143,8 +144,14 @@ export function ServerFormDialog({ open, onOpenChange, mode, initialData, onSucc
       });
       const data = await res.json();
       setTestResult(data);
+      if (data.success) {
+        toast.success(`Connected in ${data.latencyMs}ms`);
+      } else {
+        toast.error(data.error || 'Connection failed');
+      }
     } catch {
       setTestResult({ success: false, error: 'Request failed', latencyMs: 0 });
+      toast.error('Connection test failed');
     } finally {
       setIsTesting(false);
     }
@@ -185,13 +192,16 @@ export function ServerFormDialog({ open, onOpenChange, mode, initialData, onSucc
       if (!res.ok) {
         const data = await res.json();
         setErrors({ submit: data.error || 'Failed to save' });
+        toast.error(data.error || 'Failed to save server');
         return;
       }
 
       onOpenChange(false);
       onSuccess();
+      toast.success(mode === 'add' ? 'Server added' : 'Server updated');
     } catch {
       setErrors({ submit: 'Network error' });
+      toast.error('Network error');
     } finally {
       setIsSubmitting(false);
     }

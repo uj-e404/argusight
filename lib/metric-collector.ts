@@ -1,5 +1,6 @@
 import { WebSocket } from 'ws';
 import { sshPool } from './ssh-pool';
+import { logger } from './logger';
 import { broadcast } from './broadcast';
 import { readServersConfig } from './config-writer';
 import { parseCpuStatDelta, parseMemory, parseDiskUsage, parseUptime } from './parsers/linux';
@@ -140,7 +141,7 @@ async function pollOneServer(config: ServerConfig): Promise<void> {
       data.uptime = res.uptime;
     }
   } catch (err) {
-    console.warn(`[metrics] Overview poll failed for ${config.name}:`, (err as Error).message);
+    logger.warn('metrics', `Overview poll failed for ${config.name}`, { error: (err as Error).message });
   }
 
   latestOverview.set(config.id, data);
@@ -219,7 +220,7 @@ async function pollDetail() {
 
       broadcast(`server:${serverId}:stats`, point);
     } catch (err) {
-      console.warn(`[metrics] Detail poll failed for ${serverId}:`, (err as Error).message);
+      logger.warn('metrics', `Detail poll failed for ${serverId}`, { error: (err as Error).message });
     }
   }));
 }
@@ -279,7 +280,7 @@ async function pollTraffic() {
 
       broadcast(`server:${serverId}:traffic`, point);
     } catch (err) {
-      console.warn(`[metrics] Traffic poll failed for ${serverId}:`, (err as Error).message);
+      logger.warn('metrics', `Traffic poll failed for ${serverId}`, { error: (err as Error).message });
     }
   }));
 }
@@ -349,7 +350,7 @@ async function pollHotspot() {
       hotspotCache.set(serverId, data);
       broadcast(`server:${serverId}:hotspot`, data);
     } catch (err) {
-      console.warn(`[metrics] Hotspot poll failed for ${serverId}:`, (err as Error).message);
+      logger.warn('metrics', `Hotspot poll failed for ${serverId}`, { error: (err as Error).message });
     }
   }));
 }
@@ -402,7 +403,7 @@ async function pollNetwork() {
       networkCache.set(serverId, clients);
       broadcast(`server:${serverId}:network`, { clients });
     } catch (err) {
-      console.warn(`[metrics] Network poll failed for ${serverId}:`, (err as Error).message);
+      logger.warn('metrics', `Network poll failed for ${serverId}`, { error: (err as Error).message });
     }
   }));
 }
@@ -432,7 +433,7 @@ export function startMetricCollector(
   serverConfigs = servers;
   if (getInterfaceSelection) getInterfaceSelectionFn = getInterfaceSelection;
 
-  console.log(`[metrics] Starting collector for ${servers.length} server(s)`);
+  logger.info('metrics', `Starting collector for ${servers.length} server(s)`);
 
   // Initial poll after short delay to allow SSH connections to establish
   setTimeout(() => pollOverview(), 2000);
@@ -450,7 +451,7 @@ export function stopMetricCollector() {
   if (trafficTimer) { clearInterval(trafficTimer); trafficTimer = null; }
   if (hotspotTimer) { clearInterval(hotspotTimer); hotspotTimer = null; }
   if (networkTimer) { clearInterval(networkTimer); networkTimer = null; }
-  console.log('[metrics] Collector stopped');
+  logger.info('metrics', 'Collector stopped');
 }
 
 export function getRingBuffer(serverId: string): CpuRamData[] {

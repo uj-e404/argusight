@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { BarChart3 } from 'lucide-react';
 import { useServerTraffic } from '@/hooks/useServerTraffic';
 import { useWebSocket } from '@/hooks/WebSocketProvider';
 import { usePolling } from './usePolling';
@@ -114,7 +115,8 @@ export function TrafficChart({ serverId }: TrafficChartProps) {
       {/* Chart */}
       <div className="h-[300px]">
         {chartData.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-text-muted text-sm">
+          <div className="flex flex-col items-center justify-center h-full text-text-muted text-sm">
+            <BarChart3 className="h-10 w-10 text-text-muted/30 mb-2" />
             {loading ? 'Waiting for traffic data...' : selectedInterface ? 'No data yet' : 'Select an interface'}
           </div>
         ) : (

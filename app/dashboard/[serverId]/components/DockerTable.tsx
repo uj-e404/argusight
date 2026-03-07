@@ -11,6 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { usePolling } from './usePolling';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 import type { DockerContainer } from '@/lib/types';
 
 interface DockerResponse {
@@ -41,13 +42,7 @@ export function DockerTable({ serverId }: DockerTableProps) {
   const containers = data?.containers ?? [];
 
   if (!data && !error) {
-    return (
-      <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
-        <div className="flex items-center justify-center h-40 text-text-muted text-sm">
-          Loading Docker containers...
-        </div>
-      </div>
-    );
+    return <TableSkeleton columns={5} />;
   }
 
   if (error && !data) {
@@ -83,7 +78,8 @@ export function DockerTable({ serverId }: DockerTableProps) {
       </div>
 
       {containers.length === 0 ? (
-        <div className="text-center text-text-muted text-sm py-8">
+        <div className="flex flex-col items-center justify-center text-text-muted text-sm py-8">
+          <Container className="h-10 w-10 text-text-muted/30 mb-2" />
           No containers found
         </div>
       ) : (

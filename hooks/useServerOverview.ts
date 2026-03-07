@@ -8,6 +8,7 @@ export function useServerOverview() {
   const [servers, setServers] = useState<OverviewServerData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const { subscribe, unsubscribe, onReconnect, offReconnect } = useWebSocket();
   const lastWsDataRef = useRef<number>(0);
 
@@ -38,6 +39,7 @@ export function useServerOverview() {
     if (Array.isArray(m.data)) {
       setServers(m.data);
       setLoading(false);
+      setLastUpdated(new Date());
       lastWsDataRef.current = Date.now();
     }
   }, []);
@@ -63,5 +65,5 @@ export function useServerOverview() {
     return () => clearInterval(interval);
   }, [refetch]);
 
-  return { servers, loading, error, refetch };
+  return { servers, loading, error, refetch, lastUpdated };
 }

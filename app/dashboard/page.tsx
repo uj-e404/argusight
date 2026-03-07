@@ -15,13 +15,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { ArrowUpDown, Plus, ServerCog } from 'lucide-react';
+import { LastUpdated } from '@/components/ui/last-updated';
 import type { OverviewServerData } from '@/lib/types';
 
 type FilterType = 'all' | 'linux' | 'windows' | 'mikrotik';
 type SortKey = 'name' | 'cpu' | 'ram' | 'status';
 
 export default function DashboardPage() {
-  const { servers, loading, refetch } = useServerOverview();
+  const { servers, loading, refetch, lastUpdated } = useServerOverview();
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortKey>('name');
 
@@ -146,6 +147,7 @@ export default function DashboardPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2 flex-wrap">
+          <LastUpdated date={lastUpdated} />
           {filters.map((f) => (
             <Badge
               key={f.value}

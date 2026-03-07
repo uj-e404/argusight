@@ -9,6 +9,7 @@ const RING_BUFFER_MAX = 150;
 export function useServerStats(serverId: string) {
   const [data, setData] = useState<CpuRamData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const dataRef = useRef<CpuRamData[]>([]);
   const { subscribe, unsubscribe, onReconnect, offReconnect } = useWebSocket();
 
@@ -16,18 +17,18 @@ export function useServerStats(serverId: string) {
     const m = msg as { data: CpuRamData | CpuRamData[]; backfill?: boolean };
 
     if (m.backfill && Array.isArray(m.data)) {
-      // Replace buffer with backfill data
       dataRef.current = m.data.slice(-RING_BUFFER_MAX);
       setData([...dataRef.current]);
       setLoading(false);
+      setLastUpdated(new Date());
     } else if (!Array.isArray(m.data)) {
-      // Incremental: append single point
       dataRef.current = [...dataRef.current, m.data];
       if (dataRef.current.length > RING_BUFFER_MAX) {
         dataRef.current = dataRef.current.slice(-RING_BUFFER_MAX);
       }
       setData([...dataRef.current]);
       setLoading(false);
+      setLastUpdated(new Date());
     }
   }, []);
 
@@ -47,5 +48,5 @@ export function useServerStats(serverId: string) {
     return () => offReconnect(handleReconnect);
   }, [onReconnect, offReconnect]);
 
-  return { data, loading };
+  return { data, loading, lastUpdated };
 }

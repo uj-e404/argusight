@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { UserX, Users, ArrowDownToLine, ArrowUpFromLine, ArrowUpDown } from 'lucide-react';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -20,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useServerHotspot } from '@/hooks/useServerHotspot';
+import { toast } from 'sonner';
 
 interface HotspotTableProps {
   serverId: string;
@@ -99,11 +101,18 @@ export function HotspotTable({ serverId }: HotspotTableProps) {
   const kickUser = async (user: string) => {
     setKicking(user);
     try {
-      await fetch(`/api/servers/${serverId}/hotspot`, {
+      const res = await fetch(`/api/servers/${serverId}/hotspot`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user }),
       });
+      if (res.ok) {
+        toast.success(`Kicked ${user}`);
+      } else {
+        toast.error(`Failed to kick ${user}`);
+      }
+    } catch {
+      toast.error(`Failed to kick ${user}`);
     } finally {
       setKicking(null);
     }
@@ -113,24 +122,25 @@ export function HotspotTable({ serverId }: HotspotTableProps) {
     setShowKickAll(false);
     setKicking('__all__');
     try {
-      await fetch(`/api/servers/${serverId}/hotspot`, {
+      const res = await fetch(`/api/servers/${serverId}/hotspot`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
+      if (res.ok) {
+        toast.success('All users kicked');
+      } else {
+        toast.error('Failed to kick all users');
+      }
+    } catch {
+      toast.error('Failed to kick all users');
     } finally {
       setKicking(null);
     }
   };
 
   if (loading && users.length === 0) {
-    return (
-      <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
-        <div className="flex items-center justify-center h-40 text-text-muted text-sm">
-          Waiting for hotspot data...
-        </div>
-      </div>
-    );
+    return <TableSkeleton columns={7} />;
   }
 
   return (
@@ -212,7 +222,10 @@ export function HotspotTable({ serverId }: HotspotTableProps) {
               {sortedUsers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-text-muted text-sm py-8">
-                    No active hotspot users
+                    <div className="flex flex-col items-center">
+                      <Users className="h-10 w-10 text-text-muted/30 mb-2" />
+                      No active hotspot users
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (

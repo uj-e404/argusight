@@ -1,6 +1,6 @@
 'use client';
 
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, HardDrive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/table';
 import { StatusBar } from './StatusProgress';
 import { usePolling } from './usePolling';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
+import { LastUpdated } from '@/components/ui/last-updated';
 import type { DiskInfo, DiskSmartStatus } from '@/lib/types';
 
 interface DiskResponse {
@@ -41,13 +43,7 @@ export function DiskTable({ serverId }: DiskTableProps) {
   };
 
   if (!data && !error) {
-    return (
-      <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
-        <div className="flex items-center justify-center h-40 text-text-muted text-sm">
-          Loading disk information...
-        </div>
-      </div>
-    );
+    return <TableSkeleton columns={7} />;
   }
 
   if (error && !data) {
@@ -66,11 +62,7 @@ export function DiskTable({ serverId }: DiskTableProps) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-sm font-semibold text-text-primary">Disk Partitions</h3>
-          {lastUpdated && (
-            <span className="text-[11px] text-text-muted font-mono">
-              {data?.cached ? 'Cached' : 'Updated'} {lastUpdated.toLocaleTimeString()}
-            </span>
-          )}
+          <LastUpdated date={lastUpdated} prefix={data?.cached ? 'Cached' : 'Updated'} />
         </div>
         <Button
           variant="ghost"
@@ -85,7 +77,8 @@ export function DiskTable({ serverId }: DiskTableProps) {
       </div>
 
       {disks.length === 0 ? (
-        <div className="text-center text-text-muted text-sm py-8">
+        <div className="flex flex-col items-center justify-center text-text-muted text-sm py-8">
+          <HardDrive className="h-10 w-10 text-text-muted/30 mb-2" />
           No disk partitions found
         </div>
       ) : (

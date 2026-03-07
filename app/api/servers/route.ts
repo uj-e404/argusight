@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import path from 'path';
 import { nanoid } from 'nanoid';
+import { logger } from '@/lib/logger';
 import { sshPool } from '@/lib/ssh-pool';
 import { getLatestOverview, addServerToCollector } from '@/lib/metric-collector';
 import { readServersConfig, writeServersConfig } from '@/lib/config-writer';
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
     const { password: _, ...safeConfig } = newConfig;
     return NextResponse.json({ server: safeConfig }, { status: 201 });
   } catch (err) {
-    console.error('[api] Failed to save server config:', err);
+    logger.error('api', 'Failed to save server config', { error: String(err) });
     return NextResponse.json({ error: 'Failed to save server config' }, { status: 500 });
   }
 }

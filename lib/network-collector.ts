@@ -1,4 +1,5 @@
 import { sshPool } from './ssh-pool';
+import { logger } from './logger';
 import {
   parseMikroTikArp,
   parseMikroTikDhcpLeasesDetailed,
@@ -33,7 +34,7 @@ export async function collectNetworkData(serverId: string): Promise<NetworkClien
   // Avoids heavy `/ip firewall connection print detail` which times out on older/slower routers
   await sshPool.exec(serverId, '/ip accounting snapshot take').catch((err) => {
     if (!accountingWarnedServers.has(serverId)) {
-      console.warn(`[network] Accounting snapshot failed for ${serverId}: ${(err as Error).message}. Subsequent failures will be silent.`);
+      logger.warn('network', `Accounting snapshot failed for ${serverId}`, { error: (err as Error).message });
       accountingWarnedServers.add(serverId);
     }
     return '';

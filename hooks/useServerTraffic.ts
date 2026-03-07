@@ -9,6 +9,7 @@ const TRAFFIC_BUFFER_MAX = 120;
 export function useServerTraffic(serverId: string) {
   const [data, setData] = useState<TrafficPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const dataRef = useRef<TrafficPoint[]>([]);
   const { subscribe, unsubscribe, onReconnect, offReconnect } = useWebSocket();
 
@@ -19,6 +20,7 @@ export function useServerTraffic(serverId: string) {
       dataRef.current = m.data.slice(-TRAFFIC_BUFFER_MAX);
       setData([...dataRef.current]);
       setLoading(false);
+      setLastUpdated(new Date());
     } else if (!Array.isArray(m.data)) {
       dataRef.current = [...dataRef.current, m.data];
       if (dataRef.current.length > TRAFFIC_BUFFER_MAX) {
@@ -26,6 +28,7 @@ export function useServerTraffic(serverId: string) {
       }
       setData([...dataRef.current]);
       setLoading(false);
+      setLastUpdated(new Date());
     }
   }, []);
 
@@ -50,5 +53,5 @@ export function useServerTraffic(serverId: string) {
     setLoading(true);
   }, []);
 
-  return { data, loading, reset };
+  return { data, loading, reset, lastUpdated };
 }

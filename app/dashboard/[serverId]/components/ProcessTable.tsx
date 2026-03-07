@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, ArrowUpDown } from 'lucide-react';
+import { Search, ArrowUpDown, Cpu } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { usePolling } from './usePolling';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
 import type { ProcessInfo } from '@/lib/types';
 
 interface ProcessResponse {
@@ -79,13 +80,7 @@ export function ProcessTable({ serverId, serverType }: ProcessTableProps) {
   }
 
   if (!data && !error) {
-    return (
-      <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
-        <div className="flex items-center justify-center h-40 text-text-muted text-sm">
-          Loading processes...
-        </div>
-      </div>
-    );
+    return <TableSkeleton columns={5} />;
   }
 
   if (error && !data) {
@@ -144,7 +139,10 @@ export function ProcessTable({ serverId, serverType }: ProcessTableProps) {
             {filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-text-muted text-sm py-8">
-                  {search ? 'No matching processes' : 'No processes found'}
+                  <div className="flex flex-col items-center">
+                    <Cpu className="h-10 w-10 text-text-muted/30 mb-2" />
+                    {search ? 'No matching processes' : 'No processes found'}
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (

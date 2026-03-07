@@ -5,6 +5,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { jwtVerify } from 'jose';
 import { sshPool } from './lib/ssh-pool';
+import { logger } from './lib/logger';
 import { setBroadcast } from './lib/broadcast';
 import { startMetricCollector, stopMetricCollector, getRingBuffer, getTrafficBuffer, getHotspotCache, getNetworkCache, clearTrafficBuffer } from './lib/metric-collector';
 import type { ServersConfig, AuthConfig, ClientMessage } from './lib/types';
@@ -19,12 +20,12 @@ if (existsSync(authConfigPath)) {
   try {
     const authConfig: AuthConfig = JSON.parse(readFileSync(authConfigPath, 'utf-8'));
     process.env.JWT_SECRET = authConfig.jwt.secret;
-    console.log('[auth] Loaded auth config, JWT secret set');
+    logger.info('auth', 'Loaded auth config, JWT secret set');
   } catch (err) {
-    console.error('[auth] Failed to load auth.json:', err);
+    logger.error('auth', 'Failed to load auth.json', { error: String(err) });
   }
 } else {
-  console.warn('[auth] No auth.json found. Run: pnpm init-auth');
+  logger.warn('auth', 'No auth.json found. Run: pnpm init-auth');
 }
 
 // Load servers config
@@ -33,12 +34,12 @@ const serversConfigPath = join(configPath, 'servers.json');
 if (existsSync(serversConfigPath)) {
   try {
     serversConfig = JSON.parse(readFileSync(serversConfigPath, 'utf-8'));
-    console.log(`[ssh] Loaded ${serversConfig.servers.length} server(s) from config`);
+    logger.info('ssh', `Loaded ${serversConfig.servers.length} server(s) from config`);
   } catch (err) {
-    console.error('[ssh] Failed to load servers.json:', err);
+    logger.error('ssh', 'Failed to load servers.json', { error: String(err) });
   }
 } else {
-  console.warn('[ssh] No servers.json found. Copy servers.example.json → servers.json');
+  logger.warn('ssh', 'No servers.json found. Copy servers.example.json → servers.json');
 }
 
 const app = next({ dev });
@@ -63,7 +64,7 @@ app.prepare().then(async () => {
     for (const [ws] of subscriptions) {
       if (alive.get(ws) === false) {
         // No pong received since last ping — connection is stale
-        console.log('[ws] Terminating stale connection');
+        logger.warn('ws', 'Terminating stale connection');
         alive.delete(ws);
         subscriptions.delete(ws);
         wsRateLimit.delete(ws);
@@ -271,19 +272,19 @@ app.prepare().then(async () => {
   }
 
   server.listen(port, () => {
-    console.log(`[server] ArguSight running on http://localhost:${port} (${dev ? 'development' : 'production'})`);
+    logger.info('server', `ArguSight running on http://localhost:${port}`, { mode: dev ? 'development' : 'production' });
   });
 
   // Graceful shutdown
   const shutdown = () => {
-    console.log('[server] Shutting down...');
+    logger.info('server', 'Shutting down...');
     clearInterval(heartbeatInterval);
     stopMetricCollector();
     sshPool.disconnectAll();
     wss.clients.forEach((ws) => ws.close());
     wss.close();
     server.close(() => {
-      console.log('[server] Shutdown complete');
+      logger.info('server', 'Shutdown complete');
       process.exit(0);
     });
     setTimeout(() => process.exit(1), 5000);

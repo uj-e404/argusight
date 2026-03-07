@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -26,7 +27,9 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || 'Login failed');
+        const msg = data.error || 'Login failed';
+        setError(msg);
+        toast.error(msg);
         setLoading(false);
         return;
       }
@@ -35,6 +38,7 @@ export default function LoginPage() {
       window.location.href = '/dashboard';
     } catch {
       setError('Network error. Please try again.');
+      toast.error('Network error');
       setLoading(false);
     }
   }

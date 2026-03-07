@@ -11,6 +11,7 @@ interface WebSocketContextValue {
   send: (msg: Record<string, unknown>) => void;
   onReconnect: (cb: ReconnectCallback) => void;
   offReconnect: (cb: ReconnectCallback) => void;
+  reconnect: () => void;
   isConnected: boolean;
 }
 
@@ -175,8 +176,23 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     reconnectCallbacksRef.current.delete(cb);
   }, []);
 
+  const reconnect = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    reconnectAttemptRef.current = 0;
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setIsConnected(false);
+    connect();
+  }, [connect]);
+
   return (
-    <WebSocketContext.Provider value={{ subscribe, unsubscribe, send, onReconnect, offReconnect, isConnected }}>
+    <WebSocketContext.Provider value={{ subscribe, unsubscribe, send, onReconnect, offReconnect, reconnect, isConnected }}>
       {children}
     </WebSocketContext.Provider>
   );
