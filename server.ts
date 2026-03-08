@@ -14,33 +14,73 @@ const dev = process.env.NODE_ENV !== 'production';
 const port = parseInt(process.env.PORT || '3000', 10);
 const configPath = process.env.CONFIG_PATH || join(process.cwd(), 'config');
 
-// Load auth config and set JWT_SECRET before Next.js starts
-const authConfigPath = join(configPath, 'auth.json');
-if (existsSync(authConfigPath)) {
-  try {
-    const authConfig: AuthConfig = JSON.parse(readFileSync(authConfigPath, 'utf-8'));
-    process.env.JWT_SECRET = authConfig.jwt.secret;
-    logger.info('auth', 'Loaded auth config, JWT secret set');
-  } catch (err) {
-    logger.error('auth', 'Failed to load auth.json', { error: String(err) });
+// Config validation and loading
+function validateAndLoadConfig() {
+  let needsSetup = false;
+  let serversConfig: ServersConfig = { servers: [] };
+
+  // Check auth.json
+  const authConfigPath = join(configPath, 'auth.json');
+  if (existsSync(authConfigPath)) {
+    try {
+      const authConfig: AuthConfig = JSON.parse(readFileSync(authConfigPath, 'utf-8'));
+      if (!authConfig.jwt?.secret || !authConfig.users?.length) {
+        logger.error('auth', 'auth.json is invalid: missing jwt.secret or users');
+        process.exit(1);
+      }
+      process.env.JWT_SECRET = authConfig.jwt.secret;
+      logger.info('auth', 'Loaded auth config, JWT secret set');
+    } catch (err) {
+      logger.error('auth', 'Failed to parse auth.json', { error: String(err) });
+      process.exit(1);
+    }
+  } else {
+    needsSetup = true;
+    logger.info('auth', 'No auth.json found — setup wizard will be available at /setup');
   }
-} else {
-  logger.warn('auth', 'No auth.json found. Run: pnpm init-auth');
+
+  // Check servers.json
+  const serversConfigPath = join(configPath, 'servers.json');
+  if (existsSync(serversConfigPath)) {
+    try {
+      serversConfig = JSON.parse(readFileSync(serversConfigPath, 'utf-8'));
+
+      // Validate each server entry
+      const validTypes = ['linux', 'windows', 'mikrotik'];
+      for (const server of serversConfig.servers) {
+        if (!server.id || !server.host || !server.username || !server.type) {
+          logger.error('ssh', `Server "${server.name || server.id}" missing required fields (id, host, username, type)`);
+          process.exit(1);
+        }
+        if (!validTypes.includes(server.type)) {
+          logger.error('ssh', `Server "${server.name}" has invalid type "${server.type}". Must be: ${validTypes.join(', ')}`);
+          process.exit(1);
+        }
+        if (server.authType === 'key' && server.privateKeyPath) {
+          if (!existsSync(server.privateKeyPath)) {
+            logger.warn('ssh', `SSH key not found for "${server.name}": ${server.privateKeyPath}`);
+          }
+        }
+      }
+
+      logger.info('ssh', `Loaded ${serversConfig.servers.length} server(s) from config`);
+    } catch (err) {
+      logger.error('ssh', 'Failed to parse servers.json', { error: String(err) });
+      process.exit(1);
+    }
+  } else {
+    if (!needsSetup) {
+      logger.warn('ssh', 'No servers.json found — dashboard will be empty');
+    }
+  }
+
+  // Expose setup flag so middleware can detect it
+  process.env.NEEDS_SETUP = needsSetup ? 'true' : 'false';
+
+  return { needsSetup, serversConfig };
 }
 
-// Load servers config
-let serversConfig: ServersConfig = { servers: [] };
-const serversConfigPath = join(configPath, 'servers.json');
-if (existsSync(serversConfigPath)) {
-  try {
-    serversConfig = JSON.parse(readFileSync(serversConfigPath, 'utf-8'));
-    logger.info('ssh', `Loaded ${serversConfig.servers.length} server(s) from config`);
-  } catch (err) {
-    logger.error('ssh', 'Failed to load servers.json', { error: String(err) });
-  }
-} else {
-  logger.warn('ssh', 'No servers.json found. Copy servers.example.json → servers.json');
-}
+const { serversConfig } = validateAndLoadConfig();
 
 const app = next({ dev });
 const handle = app.getRequestHandler();

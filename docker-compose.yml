@@ -1,21 +1,20 @@
 services:
   argusight:
+    # To use pre-built image instead of building locally:
+    # image: ghcr.io/uj-e404/argusight:latest
     build: .
     container_name: argusight
     ports:
-      - "4959:4959"
+      - "${PORT:-4959}:${PORT:-4959}"
     volumes:
       - ./config:/app/config
-      - ~/.ssh:/app/config/keys:ro
+      - ${SSH_KEY_DIR:-~/.ssh}:/app/config/keys:ro
     environment:
-      - PORT=4959
+      - PORT=${PORT:-4959}
       - NODE_ENV=production
       - CONFIG_PATH=/app/config
-      # Set to "false" when accessing via HTTP (no TLS/reverse proxy).
-      # This disables the Secure flag on auth cookies so browsers
-      # accept them over plain HTTP. Remove or set to "true" if you
-      # put ArguSight behind an HTTPS reverse proxy.
-      - COOKIE_SECURE=false
+      # Set to "true" if behind HTTPS reverse proxy
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
     # Next.js 16 SWC uses Rust/tokio which requires Unix domain sockets
     # for signal handling. Docker's default AppArmor profile blocks this.
     security_opt:

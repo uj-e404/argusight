@@ -41,7 +41,7 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.ts ./
 
-RUN mkdir -p config && chown node:node config
+RUN chmod -R a+r public/ && mkdir -p config && chown node:node config
 
 USER node
 

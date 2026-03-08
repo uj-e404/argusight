@@ -3,16 +3,40 @@ import { jwtVerify } from 'jose';
 
 const COOKIE_NAME = 'argusight-token';
 
-const protectedPaths = ['/dashboard', '/api/servers', '/setup'];
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const secret = process.env.JWT_SECRET;
+  const needsSetup = process.env.NEEDS_SETUP === 'true';
 
-  const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
+  // --- Setup mode: no auth.json exists yet ---
+  if (needsSetup) {
+    // Allow setup pages and setup API
+    if (pathname.startsWith('/setup') || pathname.startsWith('/api/setup')) {
+      return NextResponse.next();
+    }
+    // Redirect everything else to /setup
+    if (!pathname.startsWith('/api/')) {
+      return NextResponse.redirect(new URL('/setup', request.url));
+    }
+    // Block other API calls
+    return NextResponse.json({ error: 'Setup required' }, { status: 503 });
+  }
+
+  // --- Normal mode: auth.json exists ---
+
+  // Setup API should not be accessible after setup is complete
+  if (pathname.startsWith('/api/setup')) {
+    return NextResponse.json({ error: 'Setup already completed' }, { status: 403 });
+  }
+
+  // Public pages (login, etc.) — no auth needed
+  const isProtected = pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/api/servers') ||
+    pathname.startsWith('/setup');
+
   if (!isProtected) return NextResponse.next();
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
-  const secret = process.env.JWT_SECRET;
 
   if (!token || !secret) {
     if (pathname.startsWith('/api/')) {
@@ -57,5 +81,12 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/api/servers/:path*', '/setup/:path*'],
+  matcher: [
+    '/dashboard/:path*',
+    '/api/servers/:path*',
+    '/api/setup/:path*',
+    '/setup/:path*',
+    '/login',
+    '/',
+  ],
 };

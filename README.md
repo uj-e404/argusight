@@ -16,6 +16,7 @@ Monitor Linux, Windows, and MikroTik servers in real-time through a single dashb
 - **No database** — JSON config files, zero external dependencies
 - **SSH connection pool** — persistent connections with exponential backoff reconnect
 - **Auth** — JWT-based login with bcrypt password hashing
+- **Web-based setup wizard** — no CLI configuration needed
 - **Responsive** — mobile-friendly with collapsible sidebar
 - **Docker deployment** — multi-stage build, health checks, non-root user
 
@@ -32,53 +33,33 @@ git clone https://github.com/uj-e404/argusight.git
 cd argusight
 ```
 
-### 2. Configure servers
+### 2. Configure environment (optional)
 
 ```bash
-cp config/servers.example.json config/servers.json
+cp .env.example .env
 ```
 
-Edit `config/servers.json` with your server details:
+Default settings work out of the box. Edit `.env` to change the port or other settings.
 
-```json
-{
-  "servers": [
-    {
-      "id": "unique-id",
-      "name": "My Server",
-      "host": "192.168.1.1",
-      "port": 22,
-      "username": "root",
-      "authType": "password",
-      "password": "secret",
-      "type": "linux",
-      "features": ["cpu", "ram", "disk", "processes", "docker"]
-    }
-  ]
-}
-```
-
-Passwords support environment variable references: `"$ENV:SSH_PASS_SERVER1"`.
-
-Supported `type` values: `linux`, `windows`, `mikrotik`.
-
-### 3. Build and start
+### 3. Start
 
 ```bash
 docker compose up -d --build
 ```
 
-### 4. Set up authentication
+> **Build issues?** If the build fails due to AppArmor, use the install script instead:
+> ```bash
+> ./install.sh
+> ```
 
-```bash
-docker compose exec argusight node --import tsx scripts/setup.ts
-```
+### 4. Open the setup wizard
 
-This will prompt you to create an admin username and password.
+Go to [http://localhost:4959](http://localhost:4959) — the setup wizard will automatically guide you through:
 
-### 5. Open the dashboard
-
-Go to [http://localhost:4959](http://localhost:4959) and log in with your credentials.
+1. Creating your admin account
+2. Adding servers via a web form (no JSON editing needed)
+3. Testing SSH connections
+4. Done — start monitoring!
 
 ## Updating
 
@@ -91,21 +72,28 @@ docker compose up -d --build
 
 ### `config/auth.json`
 
-Created by the setup command. Contains bcrypt-hashed credentials and JWT secret.
+Created automatically by the setup wizard. Contains bcrypt-hashed credentials and JWT secret.
 
-To reset credentials:
+To reset credentials, delete `config/auth.json` and restart:
 
 ```bash
-docker compose exec argusight node --import tsx scripts/setup.ts
+rm config/auth.json
+docker compose restart
 ```
+
+The setup wizard will appear again at [http://localhost:4959](http://localhost:4959).
 
 ### `config/servers.json`
 
-Array of server configurations. Changes are picked up on restart:
+Server configurations created by the setup wizard. Can also be edited manually. Changes are picked up on restart:
 
 ```bash
 docker compose restart
 ```
+
+Passwords support environment variable references: `"$ENV:SSH_PASS_SERVER1"`.
+
+Supported `type` values: `linux`, `windows`, `mikrotik`.
 
 ### SSH Keys
 
@@ -117,6 +105,16 @@ volumes:
   - ~/.ssh:/app/config/keys:ro
 ```
 
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `4959` | Server port |
+| `NODE_ENV` | `production` | Node environment |
+| `CONFIG_PATH` | `/app/config` | Path to config directory |
+| `COOKIE_SECURE` | `false` | Set to `true` behind HTTPS proxy |
+| `SSH_KEY_DIR` | `~/.ssh` | Host SSH keys directory |
+
 ## Architecture
 
 ```
@@ -126,6 +124,7 @@ lib/metric-collector.ts  Polling engine (overview 5s, detail 2s, traffic 1s)
 lib/parsers/       Platform-specific output parsers
 hooks/             React hooks for WebSocket subscriptions
 app/dashboard/     Dashboard pages and components
+app/setup/         Setup wizard
 ```
 
 ## Tech Stack
@@ -137,6 +136,51 @@ app/dashboard/     Dashboard pages and components
 - **ws** — WebSocket server
 - **jose + jsonwebtoken** — JWT auth
 - **bcrypt** — password hashing
+
+## Troubleshooting
+
+### Build fails with "failed to create UnixStream: Permission denied"
+
+Next.js 16 SWC uses Rust/tokio which requires Unix domain sockets. Docker's AppArmor blocks this during build.
+
+**Fix**: Use the install script which handles this automatically:
+```bash
+./install.sh
+```
+
+### Logo/icons not showing (broken images)
+
+Static files return 500 Internal Server Error. This is a file permission issue in the Docker container.
+
+**Fix**: Already resolved in the Dockerfile. If using an older version:
+```bash
+docker exec -u root argusight chmod -R a+r /app/public/
+```
+
+### Container keeps restarting
+
+Check logs:
+```bash
+docker logs argusight
+```
+
+Common causes:
+- `auth.json` invalid — delete it and re-run setup wizard
+- `servers.json` has invalid JSON — validate with `jq . config/servers.json`
+- SSH key path wrong — check `privateKeyPath` points to `/app/config/keys/your_key`
+
+### Cannot connect to server
+
+- Verify SSH access from host first: `ssh user@host -p port`
+- Check key permissions: keys must be readable (mounted as `:ro`)
+- For MikroTik: ensure SSH is enabled and user has API access
+- For Windows: ensure OpenSSH Server is installed and running
+
+### "ECONNREFUSED" or "ETIMEDOUT" for servers
+
+- Server might be down or unreachable from Docker network
+- If server is on localhost/127.0.0.1, use host IP (e.g., `192.168.1.x`) instead
+- Check firewall: Docker container needs access to server SSH port
 
 ## Contributing
 
