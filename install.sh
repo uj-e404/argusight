@@ -1,6 +1,6 @@
 #!/bin/bash
 # install.sh - One-click ArguSight installer
-# Handles AppArmor restrictions automatically when building from source.
+# Handles AppArmor/SWC build restrictions automatically.
 
 set -e
 
@@ -32,38 +32,44 @@ if [ ! -f .env ]; then
   fi
 fi
 
-# Detect if AppArmor is active and may block the build
-if docker info 2>/dev/null | grep -q "apparmor"; then
-  echo "AppArmor detected — using buildx with insecure entitlement..."
-  echo ""
+# Always use buildx with insecure entitlement.
+# Next.js 16 SWC (Rust/tokio) needs Unix domain sockets during build,
+# which Docker's default AppArmor profile blocks. The Dockerfile uses
+# `RUN --security=insecure` (requires syntax=docker/dockerfile:1-labs)
+# which only works with a buildx builder that allows insecure entitlements.
+echo "Setting up Docker buildx builder..."
 
-  BUILDER_NAME="argusight-builder"
+BUILDER_NAME="argusight-builder"
 
-  # Create a builder that allows insecure entitlements
-  docker buildx create --name "$BUILDER_NAME" \
-    --driver docker-container \
-    --buildkitd-flags '--allow-insecure-entitlement security.insecure' \
-    2>/dev/null || true
+# Create builder with insecure entitlement support
+docker buildx create --name "$BUILDER_NAME" \
+  --driver docker-container \
+  --buildkitd-flags '--allow-insecure-entitlement security.insecure' \
+  2>/dev/null || true
 
-  docker buildx build \
-    --builder "$BUILDER_NAME" \
-    --allow security.insecure \
-    --load \
-    -t argusight:latest .
+echo "Building ArguSight image (this may take a few minutes)..."
+echo ""
 
-  # Clean up builder
-  docker buildx rm "$BUILDER_NAME" 2>/dev/null || true
+docker buildx build \
+  --builder "$BUILDER_NAME" \
+  --allow security.insecure \
+  --load \
+  -t argusight:latest .
 
-  echo ""
-  echo "Build complete! Starting container..."
-else
-  echo "Building normally..."
-  docker compose build
-  echo ""
-  echo "Build complete! Starting container..."
+echo ""
+echo "Build complete!"
+
+# Clean up builder
+docker buildx rm "$BUILDER_NAME" 2>/dev/null || true
+
+# Update docker-compose to use local image
+if grep -q "build:" docker-compose.yml 2>/dev/null; then
+  # Replace build directive with local image reference
+  sed -i 's|^\(\s*\)build: \.|\1image: argusight:latest\n\1# build: .|' docker-compose.yml 2>/dev/null || true
 fi
 
 # Start the container
+echo "Starting ArguSight..."
 docker compose up -d
 
 PORT="${PORT:-4959}"

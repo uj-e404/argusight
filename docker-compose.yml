@@ -1,8 +1,9 @@
 services:
   argusight:
-    # To use pre-built image instead of building locally:
-    # image: ghcr.io/uj-e404/argusight:latest
-    build: .
+    # Option 1: Use pre-built image from GHCR (recommended)
+    image: ghcr.io/uj-e404/argusight:latest
+    # Option 2: Build locally using ./install.sh (handles AppArmor)
+    # image: argusight:latest
     container_name: argusight
     ports:
       - "${PORT:-4959}:${PORT:-4959}"
@@ -15,8 +16,6 @@ services:
       - CONFIG_PATH=/app/config
       # Set to "true" if behind HTTPS reverse proxy
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
-    # Next.js 16 SWC uses Rust/tokio which requires Unix domain sockets
-    # for signal handling. Docker's default AppArmor profile blocks this.
     security_opt:
       - apparmor=unconfined
     restart: unless-stopped

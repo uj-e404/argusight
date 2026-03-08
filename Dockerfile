@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1-labs
+
 # Stage 1: Install dependencies
 FROM node:22-slim AS deps
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
@@ -13,16 +15,17 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Stage 2: Build
 # Next.js 16 SWC (Rust/tokio) requires Unix domain sockets for signal
-# handling, which Docker blocks via AppArmor during build. Workaround:
-# use --webpack flag instead of default Turbopack. This also fixes
-# Turbopack renaming serverExternalPackages (bcrypt, ssh2) to hashed
-# names that can't be resolved at runtime.
+# handling, which Docker's AppArmor blocks during build. Using
+# --security=insecure bypasses this restriction. Build with:
+#   ./install.sh  (handles buildx setup automatically)
+# or manually:
+#   docker buildx build --allow security.insecure --load -t argusight .
 FROM node:22-slim AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN node_modules/.bin/next build --webpack
+RUN --security=insecure node_modules/.bin/next build --webpack
 
 # Stage 3: Runtime
 FROM node:22-slim AS runner
@@ -48,7 +51,7 @@ USER node
 EXPOSE 4959
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:4959/login || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:4959/api/health || exit 1
 
 ENTRYPOINT ["tini", "--"]
 CMD ["node", "--import", "tsx", "server.ts"]

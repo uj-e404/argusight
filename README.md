@@ -44,13 +44,18 @@ Default settings work out of the box. Edit `.env` to change the port or other se
 ### 3. Start
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
-> **Build issues?** If the build fails due to AppArmor, use the install script instead:
-> ```bash
-> ./install.sh
-> ```
+This pulls the pre-built image from GHCR. No build required.
+
+**Building from source?** Standard `docker compose build` fails on most Linux systems due to AppArmor blocking Next.js SWC. Use the install script instead:
+
+```bash
+./install.sh
+```
+
+This handles Docker buildx setup and AppArmor bypass automatically.
 
 ### 4. Open the setup wizard
 
@@ -64,8 +69,15 @@ Go to [http://localhost:4959](http://localhost:4959) — the setup wizard will a
 ## Updating
 
 ```bash
+docker compose pull
+docker compose up -d
+```
+
+Or if building from source:
+
+```bash
 git pull
-docker compose up -d --build
+./install.sh
 ```
 
 ## Configuration
