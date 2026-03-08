@@ -3,11 +3,12 @@ import { sshPool } from './ssh-pool';
 import { logger } from './logger';
 import { broadcast } from './broadcast';
 import { readServersConfig } from './config-writer';
-import { parseCpuStatDelta, parseMemory, parseDiskUsage, parseUptime } from './parsers/linux';
-import { parseCpuWindows, parseMemoryWindows, parseDiskWindows } from './parsers/windows';
+import { parseCpuStatDelta, parseMemory, parseDiskUsage, parseUptime, parseLinuxNetConnections } from './parsers/linux';
+import { parseCpuWindows, parseMemoryWindows, parseDiskWindows, parseWindowsNetStats, parseWindowsNetConnections } from './parsers/windows';
 import { parseMikroTikResource, parseMikroTikTraffic, parseMikroTikHotspotDetail, parseMikroTikHotspotStats } from './parsers/mikrotik';
 import { collectNetworkData, clearDestAccumulator } from './network-collector';
-import type { ServerConfig, OverviewServerData, CpuRamData, TrafficPoint, MikroTikHotspotUser, NetworkClient } from './types';
+import { resolveMany } from './dns-cache';
+import type { ServerConfig, OverviewServerData, CpuRamData, TrafficPoint, MikroTikHotspotUser, NetworkClient, WindowsNetData } from './types';
 
 const OVERVIEW_INTERVAL = 5000;
 const DETAIL_INTERVAL = 2000;
@@ -22,14 +23,19 @@ let detailTimer: ReturnType<typeof setInterval> | null = null;
 let trafficTimer: ReturnType<typeof setInterval> | null = null;
 let hotspotTimer: ReturnType<typeof setInterval> | null = null;
 let networkTimer: ReturnType<typeof setInterval> | null = null;
+let winnetTimer: ReturnType<typeof setInterval> | null = null;
 
 const latestOverview = new Map<string, OverviewServerData>();
 const ringBuffers = new Map<string, CpuRamData[]>();
 const trafficBuffers = new Map<string, TrafficPoint[]>();
 const hotspotCache = new Map<string, { users: MikroTikHotspotUser[]; totalBytesIn: number; totalBytesOut: number; totalRateIn: number; totalRateOut: number }>();
 const networkCache = new Map<string, NetworkClient[]>();
+const winnetCache = new Map<string, WindowsNetData>();
 const previousNetworkSnapshot = new Map<string, Map<string, { bytesIn: number; bytesOut: number; timestamp: number }>>();
 const previousHotspotSnapshot = new Map<string, Map<string, { bytesIn: number; bytesOut: number; timestamp: number }>>();
+const previousWindowsTraffic = new Map<string, { receivedBytes: number; sentBytes: number; timestamp: number }>();
+const previousWinnetTraffic = new Map<string, { receivedBytes: number; sentBytes: number; timestamp: number }>();
+const previousOverviewBandwidth = new Map<string, { receivedBytes: number; sentBytes: number; timestamp: number }>();
 
 let getSubscribersFn: (() => Map<WebSocket, Set<string>>) | null = null;
 let getInterfaceSelectionFn: ((serverId: string) => string | undefined) | null = null;
@@ -108,30 +114,95 @@ async function pollOneServer(config: ServerConfig): Promise<void> {
 
   try {
     if (config.type === 'linux') {
-      const [cpuRaw, memRaw, diskRaw, uptimeRaw] = await Promise.all([
+      const commands: Promise<string>[] = [
         sshPool.exec(config.id, 'cat /proc/stat'),
         sshPool.exec(config.id, 'free -b | grep Mem'),
         sshPool.exec(config.id, "df -h --output=source,fstype,size,used,avail,pcent,target | grep -v tmpfs | grep -v devtmpfs"),
         sshPool.exec(config.id, 'uptime -s'),
-      ]);
+      ];
+      const hasNetwork = config.features?.includes('network');
+      if (hasNetwork) commands.push(sshPool.exec(config.id, 'cat /proc/net/dev'));
+
+      const results = await Promise.all(commands);
+      const [cpuRaw, memRaw, diskRaw, uptimeRaw] = results;
       data.cpu = parseCpuStatDelta(cpuRaw, config.id);
       const mem = parseMemory(memRaw);
       data.ram = mem.percent;
       const disks = parseDiskUsage(diskRaw);
       data.disk = disks.length > 0 ? Math.max(...disks.map((d) => d.usePercent)) : 0;
       data.uptime = parseUptime(uptimeRaw);
+
+      if (hasNetwork && results[4]) {
+        try {
+          const lines = results[4].trim().split('\n').slice(2);
+          let totalRx = 0;
+          let totalTx = 0;
+          for (const line of lines) {
+            const parts = line.trim().split(/[:\s]+/);
+            if (parts[0] === 'lo') continue;
+            totalRx += parseInt(parts[1], 10) || 0;
+            totalTx += parseInt(parts[9], 10) || 0;
+          }
+          const now = Date.now();
+          const prev = previousOverviewBandwidth.get(config.id);
+          if (prev) {
+            const deltaSec = (now - prev.timestamp) / 1000;
+            if (deltaSec > 0) {
+              const deltaRx = totalRx - prev.receivedBytes;
+              const deltaTx = totalTx - prev.sentBytes;
+              data.rxBps = deltaRx >= 0 ? (deltaRx * 8) / deltaSec : 0;
+              data.txBps = deltaTx >= 0 ? (deltaTx * 8) / deltaSec : 0;
+            }
+          }
+          previousOverviewBandwidth.set(config.id, { receivedBytes: totalRx, sentBytes: totalTx, timestamp: now });
+        } catch {
+          // bandwidth parse failed, skip
+        }
+      }
     } else if (config.type === 'windows') {
-      const [cpuRaw, memRaw, diskRaw] = await Promise.all([
+      const commands: Promise<string>[] = [
         sshPool.exec(config.id, 'powershell -Command "Get-CimInstance Win32_Processor | Select-Object -ExpandProperty LoadPercentage"'),
         sshPool.exec(config.id, 'powershell -Command "Get-CimInstance Win32_OperatingSystem | Select-Object TotalVisibleMemorySize,FreePhysicalMemory | ConvertTo-Json"'),
         sshPool.exec(config.id, 'powershell -Command "Get-Volume | Select-Object DriveLetter,FileSystem,Size,SizeRemaining | ConvertTo-Json"'),
-      ]);
+      ];
+      const hasNetwork = config.features?.includes('network');
+      if (hasNetwork) commands.push(sshPool.exec(config.id, 'powershell -Command "Get-NetAdapterStatistics | Select-Object ReceivedBytes,SentBytes | ConvertTo-Json"'));
+
+      const results = await Promise.all(commands);
+      const [cpuRaw, memRaw, diskRaw] = results;
       data.cpu = parseCpuWindows(cpuRaw);
       const mem = parseMemoryWindows(memRaw);
       data.ram = mem.percent;
       const disks = parseDiskWindows(diskRaw);
       data.disk = disks.length > 0 ? Math.max(...disks.map((d) => d.usePercent)) : 0;
       data.uptime = '';
+
+      if (hasNetwork && results[3]) {
+        try {
+          const statsData = JSON.parse(results[3]);
+          const adapters: { ReceivedBytes: number; SentBytes: number }[] = Array.isArray(statsData) ? statsData : [statsData];
+          let totalRx = 0;
+          let totalTx = 0;
+          for (const a of adapters) {
+            totalRx += a.ReceivedBytes || 0;
+            totalTx += a.SentBytes || 0;
+          }
+          const now = Date.now();
+          const prev = previousOverviewBandwidth.get(config.id);
+          if (prev) {
+            const deltaSec = (now - prev.timestamp) / 1000;
+            if (deltaSec > 0) {
+              const deltaRx = totalRx - prev.receivedBytes;
+              const deltaTx = totalTx - prev.sentBytes;
+              data.rxBps = deltaRx >= 0 ? (deltaRx * 8) / deltaSec : 0;
+              data.txBps = deltaTx >= 0 ? (deltaTx * 8) / deltaSec : 0;
+            }
+          }
+          previousOverviewBandwidth.set(config.id, { receivedBytes: totalRx, sentBytes: totalTx, timestamp: now });
+        } catch {
+          // adapter stats parse failed, skip
+        }
+      }
     } else if (config.type === 'mikrotik') {
       const resourceRaw = await sshPool.exec(config.id, '/system resource print');
       const res = parseMikroTikResource(resourceRaw);
@@ -249,7 +320,7 @@ async function pollTraffic() {
 
   await Promise.all(activeIds.map(async (serverId) => {
     const config = serverConfigs.find((s) => s.id === serverId);
-    if (!config || config.type !== 'mikrotik') return;
+    if (!config || !['mikrotik', 'windows'].includes(config.type)) return;
 
     const state = sshPool.getStatus(serverId);
     if (state?.status !== 'connected') return;
@@ -258,15 +329,46 @@ async function pollTraffic() {
     if (!iface) return;
 
     try {
-      const raw = await sshPool.exec(serverId, `/interface monitor-traffic ${iface} once`);
-      const parsed = parseMikroTikTraffic(raw);
+      let point: TrafficPoint;
 
-      const point: TrafficPoint = {
-        timestamp: new Date().toISOString(),
-        interface: iface,
-        rxBps: parsed.rxBps,
-        txBps: parsed.txBps,
-      };
+      if (config.type === 'mikrotik') {
+        const raw = await sshPool.exec(serverId, `/interface monitor-traffic ${iface} once`);
+        const parsed = parseMikroTikTraffic(raw);
+        point = {
+          timestamp: new Date().toISOString(),
+          interface: iface,
+          rxBps: parsed.rxBps,
+          txBps: parsed.txBps,
+        };
+      } else {
+        // Windows: cumulative byte counters → compute delta rate
+        const escapedIface = iface.replace(/'/g, "''");
+        const raw = await sshPool.exec(serverId, `powershell -Command "Get-NetAdapterStatistics -Name '${escapedIface}' | Select-Object ReceivedBytes,SentBytes | ConvertTo-Json"`);
+        const stats = parseWindowsNetStats(raw);
+        const now = Date.now();
+        const prev = previousWindowsTraffic.get(serverId);
+
+        let rxBps = 0;
+        let txBps = 0;
+        if (prev) {
+          const deltaSec = (now - prev.timestamp) / 1000;
+          if (deltaSec > 0) {
+            const deltaRx = stats.receivedBytes - prev.receivedBytes;
+            const deltaTx = stats.sentBytes - prev.sentBytes;
+            // Handle counter reset (negative delta → emit 0)
+            rxBps = deltaRx >= 0 ? (deltaRx * 8) / deltaSec : 0;
+            txBps = deltaTx >= 0 ? (deltaTx * 8) / deltaSec : 0;
+          }
+        }
+        previousWindowsTraffic.set(serverId, { receivedBytes: stats.receivedBytes, sentBytes: stats.sentBytes, timestamp: now });
+
+        point = {
+          timestamp: new Date().toISOString(),
+          interface: iface,
+          rxBps,
+          txBps,
+        };
+      }
 
       let buffer = trafficBuffers.get(serverId);
       if (!buffer) {
@@ -408,6 +510,116 @@ async function pollNetwork() {
   }));
 }
 
+async function pollWindowsNet() {
+  const activeIds = getActiveChannelServers('winnet');
+  if (activeIds.length === 0) return;
+
+  await Promise.all(activeIds.map(async (serverId) => {
+    const config = serverConfigs.find((s) => s.id === serverId);
+    if (!config || !['windows', 'linux'].includes(config.type)) return;
+
+    const state = sshPool.getStatus(serverId);
+    if (state?.status !== 'connected') return;
+
+    try {
+      let data: WindowsNetData;
+
+      if (config.type === 'linux') {
+        const [ssRaw, netDevRaw] = await Promise.all([
+          sshPool.exec(serverId, 'ss -tnpH'),
+          sshPool.exec(serverId, 'cat /proc/net/dev'),
+        ]);
+
+        data = parseLinuxNetConnections(ssRaw);
+
+        // Compute bandwidth from /proc/net/dev
+        try {
+          const lines = netDevRaw.trim().split('\n').slice(2); // skip 2 header lines
+          let totalRx = 0;
+          let totalTx = 0;
+          for (const line of lines) {
+            const parts = line.trim().split(/[:\s]+/);
+            const iface = parts[0];
+            if (iface === 'lo') continue;
+            totalRx += parseInt(parts[1], 10) || 0;
+            totalTx += parseInt(parts[9], 10) || 0;
+          }
+
+          const now = Date.now();
+          const prev = previousWinnetTraffic.get(serverId);
+          if (prev) {
+            const deltaSec = (now - prev.timestamp) / 1000;
+            if (deltaSec > 0) {
+              const deltaRx = totalRx - prev.receivedBytes;
+              const deltaTx = totalTx - prev.sentBytes;
+              data.rxBps = deltaRx >= 0 ? (deltaRx * 8) / deltaSec : 0;
+              data.txBps = deltaTx >= 0 ? (deltaTx * 8) / deltaSec : 0;
+            }
+          }
+          previousWinnetTraffic.set(serverId, { receivedBytes: totalRx, sentBytes: totalTx, timestamp: now });
+        } catch {
+          // /proc/net/dev parse failed, keep rxBps/txBps at 0
+        }
+      } else {
+        // Windows
+        const [connectionsRaw, processesRaw, adapterStatsRaw] = await Promise.all([
+          sshPool.exec(serverId, 'powershell -Command "Get-NetTCPConnection -State Established | Select-Object OwningProcess,RemoteAddress,RemotePort | ConvertTo-Json"'),
+          sshPool.exec(serverId, 'powershell -Command "Get-Process | Select-Object Id,ProcessName | ConvertTo-Json"'),
+          sshPool.exec(serverId, 'powershell -Command "Get-NetAdapterStatistics | Select-Object ReceivedBytes,SentBytes | ConvertTo-Json"'),
+        ]);
+
+        data = parseWindowsNetConnections(connectionsRaw, processesRaw);
+
+        // Compute aggregate bandwidth from all adapters
+        try {
+          const statsData = JSON.parse(adapterStatsRaw);
+          const adapters: { ReceivedBytes: number; SentBytes: number }[] = Array.isArray(statsData) ? statsData : [statsData];
+          let totalRx = 0;
+          let totalTx = 0;
+          for (const a of adapters) {
+            totalRx += a.ReceivedBytes || 0;
+            totalTx += a.SentBytes || 0;
+          }
+
+          const now = Date.now();
+          const prev = previousWinnetTraffic.get(serverId);
+          if (prev) {
+            const deltaSec = (now - prev.timestamp) / 1000;
+            if (deltaSec > 0) {
+              const deltaRx = totalRx - prev.receivedBytes;
+              const deltaTx = totalTx - prev.sentBytes;
+              data.rxBps = deltaRx >= 0 ? (deltaRx * 8) / deltaSec : 0;
+              data.txBps = deltaTx >= 0 ? (deltaTx * 8) / deltaSec : 0;
+            }
+          }
+          previousWinnetTraffic.set(serverId, { receivedBytes: totalRx, sentBytes: totalTx, timestamp: now });
+        } catch {
+          // Adapter stats failed, keep rxBps/txBps at 0
+        }
+      }
+
+      // Resolve destination hostnames
+      const ips = data.destinations.map((d) => d.address);
+      if (ips.length > 0) {
+        const hostnames = await resolveMany(ips);
+        for (const dest of data.destinations) {
+          const hostname = hostnames.get(dest.address);
+          if (hostname) dest.hostname = hostname;
+        }
+      }
+
+      winnetCache.set(serverId, data);
+      broadcast(`server:${serverId}:winnet`, data);
+    } catch (err) {
+      logger.warn('metrics', `Net poll failed for ${serverId}`, { error: (err as Error).message });
+    }
+  }));
+}
+
+export function getWindowsNetCache(serverId: string): WindowsNetData | null {
+  return winnetCache.get(serverId) || null;
+}
+
 export function getNetworkCache(serverId: string): NetworkClient[] | null {
   return networkCache.get(serverId) || null;
 }
@@ -443,6 +655,7 @@ export function startMetricCollector(
   trafficTimer = setInterval(pollTraffic, TRAFFIC_INTERVAL);
   hotspotTimer = setInterval(pollHotspot, HOTSPOT_INTERVAL);
   networkTimer = setInterval(pollNetwork, NETWORK_INTERVAL);
+  winnetTimer = setInterval(pollWindowsNet, NETWORK_INTERVAL);
 }
 
 export function stopMetricCollector() {
@@ -451,6 +664,7 @@ export function stopMetricCollector() {
   if (trafficTimer) { clearInterval(trafficTimer); trafficTimer = null; }
   if (hotspotTimer) { clearInterval(hotspotTimer); hotspotTimer = null; }
   if (networkTimer) { clearInterval(networkTimer); networkTimer = null; }
+  if (winnetTimer) { clearInterval(winnetTimer); winnetTimer = null; }
   logger.info('metrics', 'Collector stopped');
 }
 
@@ -476,8 +690,12 @@ export function removeServerFromCollector(serverId: string) {
   trafficBuffers.delete(serverId);
   hotspotCache.delete(serverId);
   networkCache.delete(serverId);
+  winnetCache.delete(serverId);
   previousNetworkSnapshot.delete(serverId);
   previousHotspotSnapshot.delete(serverId);
+  previousWindowsTraffic.delete(serverId);
+  previousWinnetTraffic.delete(serverId);
+  previousOverviewBandwidth.delete(serverId);
   clearDestAccumulator(serverId);
 }
 

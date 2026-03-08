@@ -28,7 +28,7 @@ export async function GET(
 
   try {
     const [dnsRaw, connRaw] = await Promise.all([
-      sshPool.exec(serverId, '/ip dns cache print'),
+      sshPool.exec(serverId, '/ip dns cache print terse'),
       sshPool.exec(serverId, '/ip firewall connection print without-paging where src-address~"192.168"'),
     ]);
 

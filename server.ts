@@ -7,7 +7,7 @@ import { jwtVerify } from 'jose';
 import { sshPool } from './lib/ssh-pool';
 import { logger } from './lib/logger';
 import { setBroadcast } from './lib/broadcast';
-import { startMetricCollector, stopMetricCollector, getRingBuffer, getTrafficBuffer, getHotspotCache, getNetworkCache, clearTrafficBuffer } from './lib/metric-collector';
+import { startMetricCollector, stopMetricCollector, getRingBuffer, getTrafficBuffer, getHotspotCache, getNetworkCache, getWindowsNetCache, clearTrafficBuffer } from './lib/metric-collector';
 import type { ServersConfig, AuthConfig, ClientMessage } from './lib/types';
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -142,7 +142,7 @@ app.prepare().then(async () => {
 
         // Handle set-interface before channel validation (no channel needed)
         if (msg.type === 'set-interface') {
-          if (msg.serverId && msg.interface && /^[a-zA-Z0-9._-]+$/.test(msg.interface)) {
+          if (msg.serverId && msg.interface && /^[a-zA-Z0-9._ -]+$/.test(msg.interface)) {
             interfaceSelection.set(msg.serverId, msg.interface);
             clearTrafficBuffer(msg.serverId);
           }
@@ -197,6 +197,21 @@ app.prepare().then(async () => {
             if (cached) {
               ws.send(JSON.stringify({
                 type: 'hotspot',
+                serverId,
+                data: cached,
+                timestamp: new Date().toISOString(),
+                backfill: true,
+              }));
+            }
+          }
+
+          // Send cache for winnet channels
+          if (msg.channel.endsWith(':winnet')) {
+            const serverId = msg.channel.split(':')[1];
+            const cached = getWindowsNetCache(serverId);
+            if (cached) {
+              ws.send(JSON.stringify({
+                type: 'winnet',
                 serverId,
                 data: cached,
                 timestamp: new Date().toISOString(),

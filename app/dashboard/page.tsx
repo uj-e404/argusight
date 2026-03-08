@@ -15,11 +15,18 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { ArrowUpDown, Plus, ServerCog } from 'lucide-react';
+import { OsIcon } from '@/components/icons/OsIcon';
 import { LastUpdated } from '@/components/ui/last-updated';
 import type { OverviewServerData } from '@/lib/types';
 
 type FilterType = 'all' | 'linux' | 'windows' | 'mikrotik';
 type SortKey = 'name' | 'cpu' | 'ram' | 'status';
+
+const GROUP_ORDER: { type: 'windows' | 'linux' | 'mikrotik'; label: string }[] = [
+  { type: 'windows', label: 'Windows' },
+  { type: 'linux', label: 'Linux' },
+  { type: 'mikrotik', label: 'MikroTik' },
+];
 
 export default function DashboardPage() {
   const { servers, loading, refetch, lastUpdated } = useServerOverview();
@@ -134,9 +141,9 @@ export default function DashboardPage() {
           <Skeleton className="h-7 w-16" />
           <Skeleton className="h-7 w-20" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-48 rounded-lg" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-36 rounded-md" />
           ))}
         </div>
       </div>
@@ -208,15 +215,32 @@ export default function DashboardPage() {
           No servers match the current filter
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {filtered.map((server) => (
-            <ServerCard
-              key={server.serverId}
-              server={server}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          ))}
+        <div className="space-y-8">
+          {(filter === 'all' ? GROUP_ORDER : GROUP_ORDER.filter((g) => g.type === filter)).map((group) => {
+            const groupServers = filtered.filter((s) => s.type === group.type);
+            if (groupServers.length === 0) return null;
+            return (
+              <section key={group.type}>
+                <div className="flex items-center gap-2 mb-4">
+                  <OsIcon type={group.type} size={18} className="text-text-muted" />
+                  <h2 className="text-sm font-semibold text-text-secondary tracking-wide uppercase">
+                    {group.label}
+                  </h2>
+                  <span className="text-xs text-text-muted font-mono">({groupServers.length})</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  {groupServers.map((server) => (
+                    <ServerCard
+                      key={server.serverId}
+                      server={server}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, renameSync, existsSync } from 'fs';
 import { join } from 'path';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
@@ -17,6 +17,13 @@ export function readAuthConfig(): AuthConfig | null {
   } catch {
     return null;
   }
+}
+
+export function writeAuthConfig(config: AuthConfig): void {
+  const authPath = join(CONFIG_PATH, 'auth.json');
+  const tmpPath = authPath + '.tmp';
+  writeFileSync(tmpPath, JSON.stringify(config, null, 2), 'utf-8');
+  renameSync(tmpPath, authPath);
 }
 
 export async function verifyPassword(plaintext: string, hash: string): Promise<boolean> {

@@ -268,7 +268,7 @@ function ClientRow({
           <TableCell colSpan={2} className="pl-8">
             <div className="flex flex-col">
               {dest.domain && (
-                <span className="text-[11px] font-medium text-text-secondary leading-tight truncate max-w-[240px]">
+                <span className="text-[11px] font-medium text-text-secondary leading-tight break-all">
                   {dest.domain}
                 </span>
               )}

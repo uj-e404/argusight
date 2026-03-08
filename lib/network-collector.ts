@@ -44,7 +44,7 @@ export async function collectNetworkData(serverId: string): Promise<NetworkClien
     sshPool.exec(serverId, '/ip arp print').catch(() => ''),
     sshPool.exec(serverId, '/ip dhcp-server lease print').catch(() => ''),
     sshPool.exec(serverId, '/ip accounting snapshot print').catch(() => ''),
-    sshPool.exec(serverId, '/ip dns cache print').catch(() => ''),
+    sshPool.exec(serverId, '/ip dns cache print terse').catch(() => ''),
     sshPool.exec(serverId, '/queue simple print stats').catch(() => ''),
     sshPool.exec(serverId, '/ip firewall connection print where src-address~"192.168"').catch(() => ''),
   ]);

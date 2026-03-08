@@ -29,6 +29,7 @@ export interface AuthConfig {
     secret: string;
     expiresIn: string;
   };
+  forceChange?: boolean;
 }
 
 export interface SSHConnectionState {
@@ -47,7 +48,7 @@ export interface ClientMessage {
 }
 
 export interface ServerMessage {
-  type: 'overview' | 'stats' | 'traffic' | 'hotspot' | 'network' | 'error';
+  type: 'overview' | 'stats' | 'traffic' | 'hotspot' | 'network' | 'winnet' | 'error';
   serverId?: string;
   data: unknown;
   timestamp: string;
@@ -139,6 +140,28 @@ export interface NetworkClient {
 
 export type { MikroTikHotspotUser, MikroTikInterface } from './parsers/mikrotik';
 
+export interface WindowsNetProcess {
+  pid: number;
+  name: string;
+  connections: number;
+  remoteAddresses: string[];
+}
+
+export interface WindowsNetDestination {
+  address: string;
+  hostname?: string;
+  port: number;
+  connections: number;
+  processes: string[];
+}
+
+export interface WindowsNetData {
+  processes: WindowsNetProcess[];
+  destinations: WindowsNetDestination[];
+  rxBps: number;
+  txBps: number;
+}
+
 export interface OverviewServerData {
   serverId: string;
   name: string;
@@ -153,4 +176,6 @@ export interface OverviewServerData {
   ram: number;
   disk: number;
   uptime: string;
+  rxBps?: number;
+  txBps?: number;
 }

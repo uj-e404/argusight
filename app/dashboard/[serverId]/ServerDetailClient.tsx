@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OsIcon } from '@/components/icons/OsIcon';
+import { AllStatusTab } from './components/AllStatusTab';
+import { MikroTikAllStatusTab } from './components/MikroTikAllStatusTab';
 import { CpuRamChart } from './components/CpuRamChart';
 import { DiskTable } from './components/DiskTable';
 import { ProcessTable } from './components/ProcessTable';
@@ -16,6 +18,7 @@ import { TrafficChart } from './components/TrafficChart';
 import { DomainTable } from './components/DomainTable';
 import { HotspotTable } from './components/HotspotTable';
 import { NetworkTable } from './components/NetworkTable';
+import { WindowsNetworkTab } from './components/WindowsNetworkTab';
 import { useWebSocket } from '@/hooks/WebSocketProvider';
 import type { OverviewServerData } from '@/lib/types';
 
@@ -37,18 +40,24 @@ interface ServerDetailClientProps {
 }
 
 function buildTabs(server: ServerInfo): string[] {
-  const tabs = ['CPU/RAM'];
+  const tabs: string[] = [];
   if (server.type === 'mikrotik') {
+    tabs.push('All Status');
+    tabs.push('CPU/RAM');
     if (server.features?.includes('traffic')) tabs.push('Traffic');
     if (server.features?.includes('domains')) tabs.push('Domains');
     if (server.features?.includes('hotspot')) tabs.push('Hotspot');
     if (server.features?.includes('network')) tabs.push('Network');
     return tabs;
   }
+  // Linux/Windows: All Status first
+  tabs.push('All Status');
+  tabs.push('CPU/RAM');
   if (server.features?.includes('disk')) tabs.push('Disk');
   if (server.features?.includes('processes')) tabs.push('Processes');
   if (server.features?.includes('docker')) tabs.push('Docker');
   if (server.features?.includes('gpu')) tabs.push('GPU');
+  if (server.features?.includes('network')) tabs.push('Network');
   return tabs;
 }
 
@@ -161,6 +170,20 @@ export function ServerDetailClient({ serverId, initialServer }: ServerDetailClie
           ))}
         </TabsList>
 
+        {tabs.includes('All Status') && (
+          <TabsContent value="All Status">
+            {server.type === 'mikrotik' ? (
+              <MikroTikAllStatusTab serverId={serverId} features={server.features ?? []} />
+            ) : (
+              <AllStatusTab
+                serverId={serverId}
+                serverType={server.type}
+                features={server.features ?? []}
+              />
+            )}
+          </TabsContent>
+        )}
+
         <TabsContent value="CPU/RAM">
           <CpuRamChart serverId={serverId} />
         </TabsContent>
@@ -202,7 +225,13 @@ export function ServerDetailClient({ serverId, initialServer }: ServerDetailClie
         )}
         {tabs.includes('Network') && (
           <TabsContent value="Network">
-            <NetworkTable serverId={serverId} />
+            {server.type === 'mikrotik' ? (
+              <NetworkTable serverId={serverId} />
+            ) : (server.type === 'windows' || server.type === 'linux') ? (
+              <WindowsNetworkTab serverId={serverId} />
+            ) : (
+              <TrafficChart serverId={serverId} />
+            )}
           </TabsContent>
         )}
       </Tabs>

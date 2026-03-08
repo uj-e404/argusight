@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { sshPool } from '@/lib/ssh-pool';
 import { readServersConfig } from '@/lib/config-writer';
 import { parseMikroTikInterfaces } from '@/lib/parsers/mikrotik';
+import { parseWindowsNetAdapters } from '@/lib/parsers/windows';
 
 export async function GET(
   _request: Request,
@@ -18,7 +19,6 @@ export async function GET(
   }
 
   if (!config) return NextResponse.json({ error: 'Server not found' }, { status: 404 });
-  if (config.type !== 'mikrotik') return NextResponse.json({ error: 'Not a MikroTik server' }, { status: 400 });
 
   const state = sshPool.getStatus(serverId);
   if (state?.status !== 'connected') {
@@ -26,9 +26,17 @@ export async function GET(
   }
 
   try {
-    const raw = await sshPool.exec(serverId, '/interface print');
-    const interfaces = parseMikroTikInterfaces(raw);
-    return NextResponse.json({ interfaces });
+    if (config.type === 'mikrotik') {
+      const raw = await sshPool.exec(serverId, '/interface print');
+      const interfaces = parseMikroTikInterfaces(raw);
+      return NextResponse.json({ interfaces });
+    } else if (config.type === 'windows') {
+      const raw = await sshPool.exec(serverId, 'powershell -Command "Get-NetAdapter | Where-Object { $_.Status -eq \'Up\' } | Select-Object Name,InterfaceDescription,LinkSpeed | ConvertTo-Json"');
+      const interfaces = parseWindowsNetAdapters(raw);
+      return NextResponse.json({ interfaces });
+    } else {
+      return NextResponse.json({ error: 'Interfaces not supported for this server type' }, { status: 400 });
+    }
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }

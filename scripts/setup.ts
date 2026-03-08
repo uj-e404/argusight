@@ -53,6 +53,7 @@ async function main() {
   const authConfig = {
     users: [{ username: username.trim(), passwordHash }],
     jwt: { secret: jwtSecret, expiresIn: '24h' },
+    forceChange: true,
   };
 
   if (!existsSync(configDir)) {

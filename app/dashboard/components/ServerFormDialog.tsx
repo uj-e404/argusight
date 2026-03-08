@@ -41,8 +41,8 @@ interface ServerFormData {
 }
 
 const FEATURES_BY_TYPE: Record<ServerType, string[]> = {
-  linux: ['cpu', 'ram', 'disk', 'processes', 'docker', 'gpu'],
-  windows: ['cpu', 'ram', 'disk', 'processes', 'gpu'],
+  linux: ['cpu', 'ram', 'disk', 'processes', 'docker', 'gpu', 'network'],
+  windows: ['cpu', 'ram', 'disk', 'processes', 'gpu', 'network'],
   mikrotik: ['cpu', 'ram', 'traffic', 'domains', 'hotspot'],
 };
 
@@ -120,7 +120,7 @@ export function ServerFormDialog({ open, onOpenChange, mode, initialData, onSucc
     if (!form.username.trim()) e.username = 'Required';
     if (form.port < 1 || form.port > 65535) e.port = '1-65535';
     if (form.authType === 'password' && mode === 'add' && !form.password) e.password = 'Required';
-    if (form.authType === 'key' && !form.privateKeyPath) e.privateKeyPath = 'Required';
+    if (form.authType === 'key' && mode === 'add' && !form.privateKeyPath) e.privateKeyPath = 'Required';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -319,7 +319,9 @@ export function ServerFormDialog({ open, onOpenChange, mode, initialData, onSucc
             </div>
           ) : (
             <div className="space-y-1.5">
-              <Label className="text-text-secondary text-xs">Private Key Path *</Label>
+              <Label className="text-text-secondary text-xs">
+                Private Key Path {mode === 'add' ? '*' : '(leave blank to keep)'}
+              </Label>
               <Input
                 value={form.privateKeyPath}
                 onChange={(e) => setForm((p) => ({ ...p, privateKeyPath: e.target.value }))}

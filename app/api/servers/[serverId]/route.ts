@@ -33,6 +33,7 @@ export async function GET(
       port: config.port,
       username: config.username,
       authType: config.authType,
+      hasPrivateKey: !!config.privateKeyPath,
       status: state?.status ?? 'disconnected',
       ringBuffer,
     },
@@ -87,12 +88,16 @@ export async function PUT(
     if (authType === 'password') {
       updated.password = password ? (password as string) : existing.password;
     }
-    if (authType === 'key' && privateKeyPath) {
-      const normalized = path.normalize(privateKeyPath as string);
-      if (normalized.includes('..')) {
-        return NextResponse.json({ error: 'privateKeyPath must not contain path traversal (..)' }, { status: 400 });
+    if (authType === 'key') {
+      if (privateKeyPath) {
+        const normalized = path.normalize(privateKeyPath as string);
+        if (normalized.includes('..')) {
+          return NextResponse.json({ error: 'privateKeyPath must not contain path traversal (..)' }, { status: 400 });
+        }
+        updated.privateKeyPath = privateKeyPath as string;
+      } else {
+        updated.privateKeyPath = existing.privateKeyPath;
       }
-      updated.privateKeyPath = privateKeyPath as string;
     }
     if (os) updated.os = os as string;
     if (Array.isArray(features)) updated.features = features as string[];
@@ -105,8 +110,8 @@ export async function PUT(
     sshPool.connect(updated).catch(() => {});
     updateServerInCollector(updated);
 
-    const { password: _, ...safeConfig } = updated;
-    return NextResponse.json({ server: safeConfig });
+    const { password: _, privateKeyPath: __, ...safeUpdated } = updated;
+    return NextResponse.json({ server: { ...safeUpdated, hasPrivateKey: !!updated.privateKeyPath } });
   } catch {
     return NextResponse.json({ error: 'Failed to update server config' }, { status: 500 });
   }

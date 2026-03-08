@@ -35,7 +35,7 @@ export default function LoginPage() {
       }
 
       setSigningIn(true);
-      window.location.href = '/dashboard';
+      window.location.href = data.forceChange ? '/setup/credentials' : '/dashboard';
     } catch {
       setError('Network error. Please try again.');
       toast.error('Network error');

@@ -17,53 +17,28 @@ Monitor Linux, Windows, and MikroTik servers in real-time through a single dashb
 - **SSH connection pool** — persistent connections with exponential backoff reconnect
 - **Auth** — JWT-based login with bcrypt password hashing
 - **Responsive** — mobile-friendly with collapsible sidebar
-- **Docker-ready** — multi-stage build, health checks, non-root user
+- **Docker deployment** — multi-stage build, health checks, non-root user
+
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
 
 ## Quick Start
 
-### With pnpm
+### 1. Clone the repository
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Set up authentication (interactive)
-pnpm init-auth
-
-# Configure servers
-cp config/servers.example.json config/servers.json
-# Edit config/servers.json with your server details
-
-# Start development server
-pnpm dev
+git clone https://github.com/uj-e404/argusight.git
+cd argusight
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and log in.
-
-### With Docker
+### 2. Configure servers
 
 ```bash
-# Set up auth first
-pnpm install && pnpm init-auth
-
-# Configure servers
 cp config/servers.example.json config/servers.json
-
-# Build and run
-docker compose up -d
 ```
 
-Open [http://localhost:4959](http://localhost:4959).
-
-## Configuration
-
-### `config/auth.json`
-
-Created by `pnpm init-auth`. Contains bcrypt-hashed credentials and JWT secret.
-
-### `config/servers.json`
-
-Array of server configurations:
+Edit `config/servers.json` with your server details:
 
 ```json
 {
@@ -87,6 +62,61 @@ Passwords support environment variable references: `"$ENV:SSH_PASS_SERVER1"`.
 
 Supported `type` values: `linux`, `windows`, `mikrotik`.
 
+### 3. Build and start
+
+```bash
+docker compose up -d --build
+```
+
+### 4. Set up authentication
+
+```bash
+docker compose exec argusight node --import tsx scripts/setup.ts
+```
+
+This will prompt you to create an admin username and password.
+
+### 5. Open the dashboard
+
+Go to [http://localhost:4959](http://localhost:4959) and log in with your credentials.
+
+## Updating
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+## Configuration
+
+### `config/auth.json`
+
+Created by the setup command. Contains bcrypt-hashed credentials and JWT secret.
+
+To reset credentials:
+
+```bash
+docker compose exec argusight node --import tsx scripts/setup.ts
+```
+
+### `config/servers.json`
+
+Array of server configurations. Changes are picked up on restart:
+
+```bash
+docker compose restart
+```
+
+### SSH Keys
+
+Mount your SSH keys directory for key-based authentication:
+
+```yaml
+# docker-compose.yml (already configured)
+volumes:
+  - ~/.ssh:/app/config/keys:ro
+```
+
 ## Architecture
 
 ```
@@ -97,17 +127,6 @@ lib/parsers/       Platform-specific output parsers
 hooks/             React hooks for WebSocket subscriptions
 app/dashboard/     Dashboard pages and components
 ```
-
-## Scripts
-
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start development server (port 3000) |
-| `pnpm build` | Build for production |
-| `pnpm start` | Start production server |
-| `pnpm lint` | Run ESLint |
-| `pnpm init-auth` | Interactive auth setup |
-| `pnpm hash-password` | Hash a password (CLI utility) |
 
 ## Tech Stack
 

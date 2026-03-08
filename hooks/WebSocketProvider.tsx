@@ -91,6 +91,12 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
           const cbs = callbacksRef.current.get(channel);
           cbs?.forEach((cb) => cb(msg));
         }
+        // For winnet messages (server:{id}:winnet)
+        if (msg.type === 'winnet' && msg.serverId) {
+          const channel = `server:${msg.serverId}:winnet`;
+          const cbs = callbacksRef.current.get(channel);
+          cbs?.forEach((cb) => cb(msg));
+        }
         // For network messages (server:{id}:network)
         if (msg.type === 'network' && msg.serverId) {
           const channel = `server:${msg.serverId}:network`;

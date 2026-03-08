@@ -34,7 +34,7 @@ type SortDir = 'asc' | 'desc';
 export function DomainTable({ serverId }: DomainTableProps) {
   const { data, loading, error } = usePolling<{ domains: DomainTrafficEntry[] }>(
     `/api/servers/${serverId}/domains`,
-    10000
+    5000
   );
 
   const [search, setSearch] = useState('');
@@ -182,7 +182,7 @@ export function DomainTable({ serverId }: DomainTableProps) {
               ) : (
                 filtered.map((domain, idx) => (
                   <TableRow key={`${domain.address}-${idx}`} className="border-bg-elevated">
-                    <TableCell className="text-xs text-text-secondary truncate max-w-[300px]">
+                    <TableCell className="text-xs text-text-secondary whitespace-normal break-all">
                       {domain.name}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-text-muted">

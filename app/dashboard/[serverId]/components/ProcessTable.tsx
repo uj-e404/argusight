@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, ArrowUpDown, Cpu } from 'lucide-react';
+import { Search, ArrowUpDown, Cpu, X, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -11,8 +12,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { usePolling } from './usePolling';
 import { TableSkeleton } from '@/components/ui/table-skeleton';
+import { toast } from 'sonner';
 import type { ProcessInfo } from '@/lib/types';
 
 interface ProcessResponse {
@@ -38,6 +50,8 @@ export function ProcessTable({ serverId, serverType }: ProcessTableProps) {
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('cpu');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [killingPid, setKillingPid] = useState<number | null>(null);
+  const [confirmKill, setConfirmKill] = useState<{ pid: number; name: string } | null>(null);
   const processes = data?.processes ?? [];
   const ramUnit = data?.ramUnit ?? '%';
 
@@ -69,6 +83,25 @@ export function ProcessTable({ serverId, serverType }: ProcessTableProps) {
     }
   };
 
+  const killProcess = async (pid: number, name: string) => {
+    setKillingPid(pid);
+    try {
+      const res = await fetch(`/api/servers/${serverId}/processes/${pid}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        toast.success(`Killed process ${name} (PID ${pid})`);
+      } else {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error || `Failed to kill process ${name}`);
+      }
+    } catch {
+      toast.error(`Failed to kill process ${name}`);
+    } finally {
+      setKillingPid(null);
+    }
+  };
+
   if (serverType === 'mikrotik') {
     return (
       <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
@@ -80,7 +113,7 @@ export function ProcessTable({ serverId, serverType }: ProcessTableProps) {
   }
 
   if (!data && !error) {
-    return <TableSkeleton columns={5} />;
+    return <TableSkeleton columns={6} />;
   }
 
   if (error && !data) {
@@ -133,12 +166,13 @@ export function ProcessTable({ serverId, serverType }: ProcessTableProps) {
               <SortHeader field="name">Name</SortHeader>
               <SortHeader field="cpu">CPU%</SortHeader>
               <SortHeader field="ram">{ramUnit === 'MB' ? 'RAM (MB)' : 'RAM%'}</SortHeader>
+              <TableHead className="text-text-muted text-xs w-16">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-text-muted text-sm py-8">
+                <TableCell colSpan={6} className="text-center text-text-muted text-sm py-8">
                   <div className="flex flex-col items-center">
                     <Cpu className="h-10 w-10 text-text-muted/30 mb-2" />
                     {search ? 'No matching processes' : 'No processes found'}
@@ -181,12 +215,54 @@ export function ProcessTable({ serverId, serverType }: ProcessTableProps) {
                   >
                     {ramUnit === 'MB' ? `${proc.ram.toLocaleString()} MB` : `${proc.ram.toFixed(1)}%`}
                   </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-status-critical hover:text-status-critical hover:bg-status-critical/10"
+                      onClick={() => setConfirmKill({ pid: proc.pid, name: proc.name })}
+                      disabled={killingPid !== null}
+                    >
+                      {killingPid === proc.pid ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <X className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </div>
+
+      {/* Kill Confirmation Dialog */}
+      <AlertDialog open={confirmKill !== null} onOpenChange={(open) => !open && setConfirmKill(null)}>
+        <AlertDialogContent className="bg-bg-surface border-bg-elevated">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-text-primary">Kill Process</AlertDialogTitle>
+            <AlertDialogDescription className="text-text-muted">
+              Are you sure you want to kill <span className="font-semibold text-text-secondary">{confirmKill?.name}</span> (PID {confirmKill?.pid})?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="text-text-secondary">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (confirmKill) {
+                  killProcess(confirmKill.pid, confirmKill.name);
+                  setConfirmKill(null);
+                }
+              }}
+            >
+              Kill Process
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

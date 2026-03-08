@@ -2,6 +2,8 @@
 
 Thanks for your interest in contributing! Here's how to get started.
 
+> **Note:** End-user installation uses Docker only. The setup below is for development.
+
 ## Development Setup
 
 1. **Fork & clone** the repository

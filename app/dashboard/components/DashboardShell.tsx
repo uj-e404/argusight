@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { useServerOverview } from '@/hooks/useServerOverview';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -22,6 +22,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       {/* Mobile sidebar */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-[220px] p-0 bg-bg-dark border-bg-elevated">
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
           <Sidebar servers={servers} onNavigate={() => setSidebarOpen(false)} />
         </SheetContent>
       </Sheet>

@@ -8,6 +8,14 @@ const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
+
+  // Lazy cleanup: remove stale entries on each check instead of using setInterval
+  for (const [key, rec] of loginAttempts) {
+    if (now - rec.firstAttempt > WINDOW_MS) {
+      loginAttempts.delete(key);
+    }
+  }
+
   const record = loginAttempts.get(ip);
 
   if (!record || now - record.firstAttempt > WINDOW_MS) {
@@ -18,16 +26,6 @@ function isRateLimited(ip: string): boolean {
   record.count++;
   return record.count > MAX_ATTEMPTS;
 }
-
-// Cleanup stale entries every 30 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, record] of loginAttempts) {
-    if (now - record.firstAttempt > WINDOW_MS) {
-      loginAttempts.delete(ip);
-    }
-  }
-}, 30 * 60 * 1000);
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,9 +62,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    const token = signToken({ username: user.username });
+    const forceChange = config.forceChange === true;
+    const token = signToken({ username: user.username, forceChange });
 
-    const response = NextResponse.json({ success: true, username: user.username });
+    const response = NextResponse.json({ success: true, username: user.username, forceChange });
     const isSecure = process.env.NODE_ENV === 'production' || request.headers.get('x-forwarded-proto') === 'https';
     response.cookies.set(COOKIE_NAME, token, {
       httpOnly: true,

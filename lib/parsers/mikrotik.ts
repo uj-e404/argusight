@@ -509,27 +509,30 @@ export function parseMikroTikHotspotDetail(raw: string): MikroTikHotspotUser[] {
 }
 
 export function parseMikroTikDns(raw: string): MikroTikDnsEntry[] {
-  // RouterOS DNS cache format:
-  // Columns: NAME, TYPE, DATA, TTL
-  //    # NAME                TYPE  DATA            TTL
-  //   14 forcesafesearch...  A     216.239.38.120  20h43m21s
+  // RouterOS DNS cache terse format (no truncation):
+  // 0 name=mobile-gtm-mse.cdn.whatsapp.net type=A data=57.144.192.192 ttl=20h43m21s
   const lines = raw.trim().split('\n');
   const results: MikroTikDnsEntry[] = [];
 
   for (const line of lines) {
-    if (!line.trim() || /^(Flags|Columns|#)/i.test(line.trim())) continue;
+    const trimmed = line.trim();
+    if (!trimmed || /^(Flags|Columns|#)/i.test(trimmed)) continue;
 
-    // Match: number, name, type, data (IP), ttl
-    const match = line.match(/^\s*\d+\s+(\S+)\s+(A|AAAA)\s+(\S+)\s+(\S+)/);
-    if (!match) continue;
+    // Terse format: key=value pairs
+    const nameMatch = trimmed.match(/\bname=(\S+)/);
+    const typeMatch = trimmed.match(/\btype=(\S+)/);
+    const dataMatch = trimmed.match(/\bdata=(\S+)/);
+    const ttlMatch = trimmed.match(/\bttl=(\S+)/);
+
+    if (!nameMatch || !typeMatch || !dataMatch) continue;
 
     // Only include A records (IPv4) for connection matching
-    if (match[2] !== 'A') continue;
+    if (typeMatch[1] !== 'A') continue;
 
     results.push({
-      name: match[1],
-      address: match[3],
-      ttl: match[4],
+      name: nameMatch[1],
+      address: dataMatch[1],
+      ttl: ttlMatch?.[1] ?? '',
     });
   }
   return results;

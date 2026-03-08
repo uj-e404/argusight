@@ -1,4 +1,5 @@
-import type { DiskInfo, ProcessInfo, GpuInfo, GpuProcessInfo } from '../types';
+import type { DiskInfo, ProcessInfo, GpuInfo, GpuProcessInfo, WindowsNetData, WindowsNetProcess, WindowsNetDestination } from '../types';
+import type { MikroTikInterface } from './mikrotik';
 
 export function parseCpuWindows(raw: string): number {
   // Input from: Get-CimInstance Win32_Processor | Select-Object -ExpandProperty LoadPercentage
@@ -81,6 +82,117 @@ export function parseProcessWindows(raw: string, logicalProcessors?: number): Pr
     });
   } catch {
     return [];
+  }
+}
+
+export function parseWindowsNetAdapters(raw: string): MikroTikInterface[] {
+  // Input from: Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Select-Object Name,InterfaceDescription,LinkSpeed | ConvertTo-Json
+  try {
+    const data = JSON.parse(raw);
+    const adapters = Array.isArray(data) ? data : [data];
+    return adapters.map((a: Record<string, unknown>) => ({
+      name: (a.Name as string) || '',
+      type: (a.InterfaceDescription as string) || '',
+      running: true,
+      disabled: false,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export function parseWindowsNetStats(raw: string): { receivedBytes: number; sentBytes: number } {
+  // Input from: Get-NetAdapterStatistics -Name '...' | Select-Object ReceivedBytes,SentBytes | ConvertTo-Json
+  try {
+    const obj = JSON.parse(raw);
+    return {
+      receivedBytes: (obj.ReceivedBytes as number) || 0,
+      sentBytes: (obj.SentBytes as number) || 0,
+    };
+  } catch {
+    return { receivedBytes: 0, sentBytes: 0 };
+  }
+}
+
+const LOOPBACK_SET = new Set(['127.0.0.1', '::1', '0.0.0.0', '::', '']);
+const SYSTEM_PIDS = new Set([0, 4]);
+
+function isPrivateIP(ip: string): boolean {
+  if (ip.includes(':')) return ip.startsWith('fe80') || ip === '::1' || ip === '::';
+  const parts = ip.split('.').map(Number);
+  if (parts[0] === 10) return true;
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+  if (parts[0] === 192 && parts[1] === 168) return true;
+  if (parts[0] === 127) return true;
+  return false;
+}
+
+export function parseWindowsNetConnections(connectionsRaw: string, processesRaw: string): WindowsNetData {
+  try {
+    const connData = JSON.parse(connectionsRaw);
+    const connections: { OwningProcess: number; RemoteAddress: string; RemotePort: number }[] =
+      Array.isArray(connData) ? connData : [connData];
+
+    const procData = JSON.parse(processesRaw);
+    const procList: { Id: number; ProcessName: string }[] = Array.isArray(procData) ? procData : [procData];
+    const pidToName = new Map<number, string>();
+    for (const p of procList) {
+      pidToName.set(p.Id, p.ProcessName || 'Unknown');
+    }
+
+    // Filter out loopback and system PIDs
+    const valid = connections.filter(
+      (c) => !LOOPBACK_SET.has(c.RemoteAddress) && !SYSTEM_PIDS.has(c.OwningProcess)
+    );
+
+    // Group by process
+    const procMap = new Map<number, { name: string; connections: number; remoteAddresses: Set<string> }>();
+    for (const c of valid) {
+      let entry = procMap.get(c.OwningProcess);
+      if (!entry) {
+        entry = { name: pidToName.get(c.OwningProcess) || `PID ${c.OwningProcess}`, connections: 0, remoteAddresses: new Set() };
+        procMap.set(c.OwningProcess, entry);
+      }
+      entry.connections++;
+      entry.remoteAddresses.add(c.RemoteAddress);
+    }
+
+    const processes: WindowsNetProcess[] = [...procMap.entries()]
+      .map(([pid, e]) => ({ pid, name: e.name, connections: e.connections, remoteAddresses: [...e.remoteAddresses] }))
+      .sort((a, b) => b.connections - a.connections)
+      .slice(0, 15);
+
+    // Group by remote address (skip private/loopback for destinations)
+    const destMap = new Map<string, { port: number; portCounts: Map<number, number>; connections: number; processes: Set<string> }>();
+    for (const c of valid) {
+      if (isPrivateIP(c.RemoteAddress)) continue;
+      let entry = destMap.get(c.RemoteAddress);
+      if (!entry) {
+        entry = { port: c.RemotePort, portCounts: new Map(), connections: 0, processes: new Set() };
+        destMap.set(c.RemoteAddress, entry);
+      }
+      entry.connections++;
+      entry.portCounts.set(c.RemotePort, (entry.portCounts.get(c.RemotePort) || 0) + 1);
+      const pname = pidToName.get(c.OwningProcess);
+      if (pname) entry.processes.add(pname);
+    }
+
+    const destinations: WindowsNetDestination[] = [...destMap.entries()]
+      .map(([address, e]) => {
+        // Find most common port
+        let topPort = e.port;
+        let topCount = 0;
+        for (const [port, count] of e.portCounts) {
+          if (count > topCount) { topPort = port; topCount = count; }
+        }
+        return { address, port: topPort, connections: e.connections, processes: [...e.processes] };
+      })
+      .sort((a, b) => b.connections - a.connections)
+      .slice(0, 20);
+
+    return { processes, destinations, rxBps: 0, txBps: 0 };
+  } catch {
+    return { processes: [], destinations: [], rxBps: 0, txBps: 0 };
   }
 }
 
