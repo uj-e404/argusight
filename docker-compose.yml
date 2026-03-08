@@ -11,4 +11,13 @@ services:
       - PORT=4959
       - NODE_ENV=production
       - CONFIG_PATH=/app/config
+      # Set to "false" when accessing via HTTP (no TLS/reverse proxy).
+      # This disables the Secure flag on auth cookies so browsers
+      # accept them over plain HTTP. Remove or set to "true" if you
+      # put ArguSight behind an HTTPS reverse proxy.
+      - COOKIE_SECURE=false
+    # Next.js 16 SWC uses Rust/tokio which requires Unix domain sockets
+    # for signal handling. Docker's default AppArmor profile blocks this.
+    security_opt:
+      - apparmor=unconfined
     restart: unless-stopped

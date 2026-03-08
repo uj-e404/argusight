@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     const token = signToken({ username: user.username, forceChange });
 
     const response = NextResponse.json({ success: true, username: user.username, forceChange });
-    const isSecure = process.env.NODE_ENV === 'production' || request.headers.get('x-forwarded-proto') === 'https';
+    const isSecure = process.env.COOKIE_SECURE === 'false' ? false : (process.env.NODE_ENV === 'production' || request.headers.get('x-forwarded-proto') === 'https');
     response.cookies.set(COOKIE_NAME, token, {
       httpOnly: true,
       secure: isSecure,

@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     // Clear cookie to force re-login
     const response = NextResponse.json({ success: true });
-    const isSecure = process.env.NODE_ENV === 'production' || request.headers.get('x-forwarded-proto') === 'https';
+    const isSecure = process.env.COOKIE_SECURE === 'false' ? false : (process.env.NODE_ENV === 'production' || request.headers.get('x-forwarded-proto') === 'https');
     response.cookies.set(COOKIE_NAME, '', {
       httpOnly: true,
       secure: isSecure,
