@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1-labs
-
 # Stage 1: Install dependencies
 FROM node:22-slim AS deps
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
@@ -14,18 +12,14 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Stage 2: Build
-# Next.js 16 SWC (Rust/tokio) requires Unix domain sockets for signal
-# handling, which Docker's AppArmor blocks during build. Using
-# --security=insecure bypasses this restriction. Build with:
-#   ./install.sh  (handles buildx setup automatically)
-# or manually:
-#   docker buildx build --allow security.insecure --load -t argusight .
+# --webpack flag forces Webpack compiler instead of SWC, avoiding the
+# AppArmor Unix domain socket issue in Docker builds.
 FROM node:22-slim AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN --security=insecure node_modules/.bin/next build --webpack
+RUN node_modules/.bin/next build --webpack
 
 # Stage 3: Runtime
 FROM node:22-slim AS runner

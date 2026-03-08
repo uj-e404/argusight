@@ -61,9 +61,6 @@ export function Navbar({ onMenuToggle }: NavbarProps) {
             v{current}
           </span>
         )}
-      </div>
-
-      <div className="ml-auto flex items-center gap-3">
         {updateAvailable && (
           <a
             href={releaseUrl ?? '#'}
@@ -77,6 +74,9 @@ export function Navbar({ onMenuToggle }: NavbarProps) {
             </span>
           </a>
         )}
+      </div>
+
+      <div className="ml-auto flex items-center gap-3">
         <div className="flex items-center gap-2">
           <div
             className={`w-2 h-2 rounded-full ${
