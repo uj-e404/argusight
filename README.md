@@ -49,13 +49,13 @@ docker compose up -d
 
 This pulls the pre-built image from GHCR. No build required.
 
-**Building from source?** Standard `docker compose build` fails on most Linux systems due to AppArmor blocking Next.js SWC. Use the install script instead:
+**Prefer to build locally?** Use the install script:
 
 ```bash
 ./install.sh
 ```
 
-This handles Docker buildx setup and AppArmor bypass automatically.
+This builds the image locally and starts the container. You can still update later with `docker compose pull`.
 
 ### 4. Open the setup wizard
 
@@ -153,11 +153,11 @@ app/setup/         Setup wizard
 
 ### Build fails with "failed to create UnixStream: Permission denied"
 
-Next.js 16 SWC uses Rust/tokio which requires Unix domain sockets. Docker's AppArmor blocks this during build.
+Next.js SWC compiler requires Unix domain sockets, which AppArmor may block during Docker build on some Linux systems.
 
-**Fix**: Use the install script which handles this automatically:
+**Fix**: Use `./install.sh` which handles this automatically. Or build with webpack bundler:
 ```bash
-./install.sh
+docker build --build-arg NEXT_BUNDLER=webpack -t ghcr.io/uj-e404/argusight:latest .
 ```
 
 ### Logo/icons not showing (broken images)

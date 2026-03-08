@@ -1,9 +1,6 @@
 services:
   argusight:
-    # Option 1: Use pre-built image from GHCR (recommended)
     image: ghcr.io/uj-e404/argusight:latest
-    # Option 2: Build locally using ./install.sh (handles AppArmor)
-    # image: argusight:latest
     container_name: argusight
     ports:
       - "${PORT:-4959}:${PORT:-4959}"
@@ -16,6 +13,4 @@ services:
       - CONFIG_PATH=/app/config
       # Set to "true" if behind HTTPS reverse proxy
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
-    security_opt:
-      - apparmor=unconfined
     restart: unless-stopped

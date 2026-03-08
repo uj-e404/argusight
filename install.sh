@@ -34,14 +34,10 @@ fi
 echo "Building ArguSight image (this may take a few minutes)..."
 echo ""
 
-docker build -t argusight:latest .
+docker build -t ghcr.io/uj-e404/argusight:latest .
 
 echo ""
 echo "Build complete!"
-
-# Update docker-compose to use locally built image instead of GHCR
-sed -i 's|image: ghcr.io/uj-e404/argusight:latest|image: argusight:latest|' docker-compose.yml
-echo "Updated docker-compose.yml to use local image"
 
 # Start the container
 echo "Starting ArguSight..."
