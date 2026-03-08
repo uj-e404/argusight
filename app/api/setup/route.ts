@@ -22,13 +22,16 @@ interface SetupServerInput {
 }
 
 export async function GET() {
-  const needsSetup = process.env.NEEDS_SETUP === 'true';
+  // Check if auth.json exists (filesystem check, not env var)
+  const authPath = join(CONFIG_PATH, 'auth.json');
+  const needsSetup = !existsSync(authPath);
   return NextResponse.json({ needsSetup });
 }
 
 export async function POST(request: NextRequest) {
-  // Only allow setup when NEEDS_SETUP is true
-  if (process.env.NEEDS_SETUP !== 'true') {
+  // Only allow setup when auth.json doesn't exist
+  const authPath = join(CONFIG_PATH, 'auth.json');
+  if (existsSync(authPath)) {
     return NextResponse.json({ error: 'Setup already completed' }, { status: 403 });
   }
 
@@ -62,12 +65,10 @@ export async function POST(request: NextRequest) {
       jwt: { secret: jwtSecret, expiresIn: '24h' },
     };
 
-    const authPath = join(CONFIG_PATH, 'auth.json');
     writeFileSync(authPath, JSON.stringify(authConfig, null, 2), 'utf-8');
 
-    // Set JWT_SECRET for immediate use
+    // Set JWT_SECRET for immediate use (middleware picks this up on next request)
     process.env.JWT_SECRET = jwtSecret;
-    process.env.NEEDS_SETUP = 'false';
 
     // Create servers.json if servers provided
     if (servers && servers.length > 0) {

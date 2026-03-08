@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -11,6 +11,18 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+
+  // Check if setup is needed — redirect to wizard if so
+  useEffect(() => {
+    fetch('/api/setup')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.needsSetup) {
+          window.location.href = '/setup';
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

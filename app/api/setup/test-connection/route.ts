@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client } from 'ssh2';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 
 const MIKROTIK_ALGORITHMS = {
   kex: [
@@ -22,8 +23,9 @@ const MIKROTIK_ALGORITHMS = {
 };
 
 export async function POST(request: NextRequest) {
-  // Only allow during setup mode
-  if (process.env.NEEDS_SETUP !== 'true') {
+  // Only allow during setup mode (auth.json doesn't exist yet)
+  const configPath = process.env.CONFIG_PATH || join(process.cwd(), 'config');
+  if (existsSync(join(configPath, 'auth.json'))) {
     return NextResponse.json({ error: 'Setup already completed' }, { status: 403 });
   }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Eye, EyeOff, Loader2, Plus, Trash2, CheckCircle2,
   Server, ShieldCheck, ChevronRight, ChevronLeft, Wifi, WifiOff,
@@ -77,7 +77,8 @@ function createEmptyServer(): ServerEntry {
 }
 
 export default function SetupWizardPage() {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0); // 0 = loading/checking
+  const [ready, setReady] = useState(false);
 
   // Step 1: Credentials
   const [username, setUsername] = useState('');
@@ -93,6 +94,25 @@ export default function SetupWizardPage() {
   // General
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Check if setup is actually needed
+  useEffect(() => {
+    fetch('/api/setup')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.needsSetup) {
+          window.location.href = '/login';
+        } else {
+          setStep(1);
+          setReady(true);
+        }
+      })
+      .catch(() => {
+        // If API fails, assume setup is needed
+        setStep(1);
+        setReady(true);
+      });
+  }, []);
 
   // --- Step 1 validation ---
   function validateStep1(): boolean {
@@ -284,8 +304,15 @@ export default function SetupWizardPage() {
       />
       <div className="absolute inset-0 grid-pattern" />
 
+      {/* Loading state */}
+      {!ready && (
+        <div className="relative z-10 flex flex-col items-center justify-center gap-4">
+          <Loader2 size={32} className="animate-spin text-gold-primary" />
+        </div>
+      )}
+
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center gap-6 px-4 w-full max-w-2xl py-12">
+      {ready && <div className="relative z-10 flex flex-col items-center gap-6 px-4 w-full max-w-2xl py-12">
         {/* Logo */}
         <div className="animate-float">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -687,7 +714,7 @@ export default function SetupWizardPage() {
             </div>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

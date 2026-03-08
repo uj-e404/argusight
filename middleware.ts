@@ -6,30 +6,33 @@ const COOKIE_NAME = 'argusight-token';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const secret = process.env.JWT_SECRET;
-  const needsSetup = process.env.NEEDS_SETUP === 'true';
 
-  // --- Setup mode: no auth.json exists yet ---
-  if (needsSetup) {
-    // Allow setup pages and setup API
+  // --- No JWT_SECRET means auth.json doesn't exist (setup needed) ---
+  if (!secret) {
+    // Allow setup pages and setup API (needed for initial setup)
     if (pathname.startsWith('/setup') || pathname.startsWith('/api/setup')) {
       return NextResponse.next();
     }
-    // Redirect everything else to /setup
-    if (!pathname.startsWith('/api/')) {
-      return NextResponse.redirect(new URL('/setup', request.url));
+    // Protected API calls fail with 503
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Setup required' }, { status: 503 });
     }
-    // Block other API calls
-    return NextResponse.json({ error: 'Setup required' }, { status: 503 });
+    // All other pages: let them load (login/root pages will detect setup needed via API)
+    return NextResponse.next();
   }
 
-  // --- Normal mode: auth.json exists ---
+  // --- JWT_SECRET exists: normal auth mode ---
 
-  // Setup API should not be accessible after setup is complete
+  // Setup API: block after setup is complete (check via env flag set by API)
   if (pathname.startsWith('/api/setup')) {
-    return NextResponse.json({ error: 'Setup already completed' }, { status: 403 });
+    // Allow GET (status check) but block POST
+    if (request.method !== 'GET') {
+      return NextResponse.json({ error: 'Setup already completed' }, { status: 403 });
+    }
+    return NextResponse.next();
   }
 
-  // Public pages (login, etc.) — no auth needed
+  // Public pages (login, root) — no auth needed
   const isProtected = pathname.startsWith('/dashboard') ||
     pathname.startsWith('/api/servers') ||
     pathname.startsWith('/setup');
@@ -38,7 +41,7 @@ export async function middleware(request: NextRequest) {
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
 
-  if (!token || !secret) {
+  if (!token) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -57,7 +60,6 @@ export async function middleware(request: NextRequest) {
       if (pathname.startsWith('/setup')) {
         return NextResponse.next();
       }
-      // Block dashboard and API access
       if (pathname.startsWith('/api/')) {
         return NextResponse.json({ error: 'Credential change required' }, { status: 403 });
       }

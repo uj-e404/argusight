@@ -74,9 +74,6 @@ function validateAndLoadConfig() {
     }
   }
 
-  // Expose setup flag so middleware can detect it
-  process.env.NEEDS_SETUP = needsSetup ? 'true' : 'false';
-
   return { needsSetup, serversConfig };
 }
 
