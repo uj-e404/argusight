@@ -1,6 +1,6 @@
 {
   "name": "argusight",
-  "version": "1.13.4",
+  "version": "1.14.4",
   "private": true,
   "scripts": {
     "dev": "tsx --watch server.ts",

@@ -110,11 +110,11 @@ export function DomainTable({ serverId }: DomainTableProps) {
     <div className="space-y-4">
       {/* Top 20 Bar Chart */}
       {top20.length > 0 && (
-        <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
+        <div className="bg-bg-surface border border-bg-elevated rounded-lg p-3 sm:p-6">
           <h3 className="text-sm font-semibold text-text-primary mb-4">
             Top Domains by Connections
           </h3>
-          <div className="h-[300px]">
+          <div className="hidden sm:block h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={top20} layout="vertical" margin={{ left: 120 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2A2A3C" />
@@ -140,16 +140,25 @@ export function DomainTable({ serverId }: DomainTableProps) {
               </BarChart>
             </ResponsiveContainer>
           </div>
+          {/* Mobile: simple list instead of chart */}
+          <div className="sm:hidden space-y-1.5">
+            {top20.map((d, i) => (
+              <div key={i} className="flex justify-between items-center text-xs">
+                <span className="text-text-secondary truncate mr-2">{d.name}</span>
+                <span className="font-mono text-gold-primary font-bold flex-shrink-0">{d.connections}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Domain Table */}
-      <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-bg-surface border border-bg-elevated rounded-lg p-3 sm:p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
           <h3 className="text-sm font-semibold text-text-primary">
             Domains ({filtered.length})
           </h3>
-          <div className="relative w-60">
+          <div className="relative w-full sm:w-60">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" />
             <Input
               placeholder="Search domain or address..."

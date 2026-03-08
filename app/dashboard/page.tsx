@@ -152,7 +152,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div className="flex items-center gap-2 flex-wrap">
           <LastUpdated date={lastUpdated} />
           {filters.map((f) => (

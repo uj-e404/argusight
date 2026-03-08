@@ -168,43 +168,63 @@ function DiskSection({ serverId, enabled, onReady }: { serverId: string; enabled
       ) : disks.length === 0 ? (
         <div className="text-xs text-text-muted py-4 text-center">No disks found</div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow className="border-bg-elevated hover:bg-transparent">
-              <TableHead className="text-text-muted text-xs py-1">Filesystem</TableHead>
-              <TableHead className="text-text-muted text-xs py-1 min-w-[120px]">Usage</TableHead>
-              <TableHead className="text-text-muted text-xs py-1">Mount</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <>
+          {/* Mobile card view */}
+          <div className="sm:hidden space-y-2">
             {disks.map((disk, i) => (
-              <TableRow key={`${disk.filesystem}-${i}`} className="border-bg-elevated">
-                <TableCell className="font-mono text-xs text-text-secondary py-1.5">
-                  {disk.filesystem}
-                </TableCell>
-                <TableCell className="py-1.5">
-                  <div className="flex items-center gap-2">
-                    <StatusBar value={disk.usePercent} warn={70} critical={85} className="flex-1" />
-                    <span
-                      className={`font-mono text-xs font-bold min-w-[36px] text-right ${
-                        disk.usePercent >= 85
-                          ? 'text-status-critical'
-                          : disk.usePercent >= 70
-                            ? 'text-gold-primary'
-                            : 'text-status-healthy'
-                      }`}
-                    >
-                      {disk.usePercent}%
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="font-mono text-xs text-text-muted py-1.5">
-                  {disk.mountpoint}
-                </TableCell>
-              </TableRow>
+              <div key={`${disk.filesystem}-${i}`} className="border border-bg-elevated rounded-md p-2.5 space-y-1.5">
+                <div className="font-mono text-xs text-text-secondary truncate">{disk.filesystem}</div>
+                <div className="flex items-center gap-2">
+                  <StatusBar value={disk.usePercent} warn={70} critical={85} className="flex-1" />
+                  <span className={`font-mono text-xs font-bold min-w-[36px] text-right ${disk.usePercent >= 85 ? 'text-status-critical' : disk.usePercent >= 70 ? 'text-gold-primary' : 'text-status-healthy'}`}>
+                    {disk.usePercent}%
+                  </span>
+                </div>
+                <div className="font-mono text-[11px] text-text-muted">{disk.mountpoint}</div>
+              </div>
             ))}
-          </TableBody>
-        </Table>
+          </div>
+          {/* Desktop table */}
+          <div className="hidden sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-bg-elevated hover:bg-transparent">
+                  <TableHead className="text-text-muted text-xs py-1">Filesystem</TableHead>
+                  <TableHead className="text-text-muted text-xs py-1 min-w-[120px]">Usage</TableHead>
+                  <TableHead className="text-text-muted text-xs py-1">Mount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {disks.map((disk, i) => (
+                  <TableRow key={`${disk.filesystem}-${i}`} className="border-bg-elevated">
+                    <TableCell className="font-mono text-xs text-text-secondary py-1.5">
+                      {disk.filesystem}
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <div className="flex items-center gap-2">
+                        <StatusBar value={disk.usePercent} warn={70} critical={85} className="flex-1" />
+                        <span
+                          className={`font-mono text-xs font-bold min-w-[36px] text-right ${
+                            disk.usePercent >= 85
+                              ? 'text-status-critical'
+                              : disk.usePercent >= 70
+                                ? 'text-gold-primary'
+                                : 'text-status-healthy'
+                          }`}
+                        >
+                          {disk.usePercent}%
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-text-muted py-1.5">
+                      {disk.mountpoint}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
     </div>
   );
@@ -351,28 +371,44 @@ function DockerSection({ serverId, enabled, onReady }: { serverId: string; enabl
       ) : containers.length === 0 ? (
         <div className="text-xs text-text-muted py-4 text-center">No containers found</div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow className="border-bg-elevated hover:bg-transparent">
-              <TableHead className="text-text-muted text-xs py-1">Name</TableHead>
-              <TableHead className="text-text-muted text-xs py-1 text-right">State</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <>
+          {/* Mobile card view */}
+          <div className="sm:hidden space-y-1.5">
             {containers.map((c) => (
-              <TableRow key={c.name} className="border-bg-elevated">
-                <TableCell className="font-mono text-xs text-text-secondary py-1.5 truncate max-w-[200px]">
-                  {c.name}
-                </TableCell>
-                <TableCell className="text-right py-1.5">
-                  <Badge className={`text-[10px] px-1.5 py-0 ${DOCKER_STATE_STYLES[c.state] ?? 'bg-text-muted/20 text-text-muted border-0'}`}>
-                    {c.state}
-                  </Badge>
-                </TableCell>
-              </TableRow>
+              <div key={c.name} className="flex items-center justify-between border border-bg-elevated rounded-md px-2.5 py-1.5">
+                <span className="font-mono text-xs text-text-secondary truncate mr-2">{c.name}</span>
+                <Badge className={`text-[10px] px-1.5 py-0 flex-shrink-0 ${DOCKER_STATE_STYLES[c.state] ?? 'bg-text-muted/20 text-text-muted border-0'}`}>
+                  {c.state}
+                </Badge>
+              </div>
             ))}
-          </TableBody>
-        </Table>
+          </div>
+          {/* Desktop table */}
+          <div className="hidden sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-bg-elevated hover:bg-transparent">
+                  <TableHead className="text-text-muted text-xs py-1">Name</TableHead>
+                  <TableHead className="text-text-muted text-xs py-1 text-right">State</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {containers.map((c) => (
+                  <TableRow key={c.name} className="border-bg-elevated">
+                    <TableCell className="font-mono text-xs text-text-secondary py-1.5 truncate max-w-[200px]">
+                      {c.name}
+                    </TableCell>
+                    <TableCell className="text-right py-1.5">
+                      <Badge className={`text-[10px] px-1.5 py-0 ${DOCKER_STATE_STYLES[c.state] ?? 'bg-text-muted/20 text-text-muted border-0'}`}>
+                        {c.state}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
     </div>
   );
@@ -413,50 +449,71 @@ function ProcessSection({ serverId, enabled, onReady }: { serverId: string; enab
       ) : top5.length === 0 ? (
         <div className="text-xs text-text-muted py-4 text-center">No process data</div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow className="border-bg-elevated hover:bg-transparent">
-              <TableHead className="text-text-muted text-xs py-1">Name</TableHead>
-              <TableHead className="text-text-muted text-xs py-1 text-right">CPU%</TableHead>
-              <TableHead className="text-text-muted text-xs py-1 text-right">RAM</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <>
+          {/* Mobile card view */}
+          <div className="sm:hidden space-y-1.5">
             {top5.map((proc) => (
-              <TableRow key={proc.pid} className="border-bg-elevated">
-                <TableCell className="text-xs text-text-secondary truncate max-w-[200px] py-1.5">
-                  {proc.name}
-                </TableCell>
-                <TableCell
-                  className={`font-mono text-xs font-bold text-right py-1.5 ${
-                    proc.cpu >= 80
-                      ? 'text-status-critical'
-                      : proc.cpu >= 50
-                        ? 'text-gold-primary'
-                        : 'text-text-secondary'
-                  }`}
-                >
-                  {proc.cpu.toFixed(1)}%
-                </TableCell>
-                <TableCell
-                  className={`font-mono text-xs font-bold text-right py-1.5 ${
-                    ramUnit === 'MB'
-                      ? proc.ram >= 1024
-                        ? 'text-gold-primary'
-                        : 'text-text-secondary'
-                      : proc.ram >= 80
-                        ? 'text-status-critical'
-                        : proc.ram >= 50
-                          ? 'text-gold-primary'
-                          : 'text-text-secondary'
-                  }`}
-                >
-                  {ramUnit === 'MB' ? `${proc.ram.toLocaleString()} MB` : `${proc.ram.toFixed(1)}%`}
-                </TableCell>
-              </TableRow>
+              <div key={proc.pid} className="flex items-center justify-between border border-bg-elevated rounded-md px-2.5 py-1.5">
+                <span className="text-xs text-text-secondary truncate mr-2">{proc.name}</span>
+                <div className="flex gap-2 text-xs font-mono font-bold flex-shrink-0">
+                  <span className={proc.cpu >= 80 ? 'text-status-critical' : proc.cpu >= 50 ? 'text-gold-primary' : 'text-text-secondary'}>
+                    {proc.cpu.toFixed(1)}%
+                  </span>
+                  <span className={ramUnit === 'MB' ? (proc.ram >= 1024 ? 'text-gold-primary' : 'text-text-secondary') : (proc.ram >= 80 ? 'text-status-critical' : proc.ram >= 50 ? 'text-gold-primary' : 'text-text-secondary')}>
+                    {ramUnit === 'MB' ? `${proc.ram.toLocaleString()}M` : `${proc.ram.toFixed(1)}%`}
+                  </span>
+                </div>
+              </div>
             ))}
-          </TableBody>
-        </Table>
+          </div>
+          {/* Desktop table */}
+          <div className="hidden sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-bg-elevated hover:bg-transparent">
+                  <TableHead className="text-text-muted text-xs py-1">Name</TableHead>
+                  <TableHead className="text-text-muted text-xs py-1 text-right">CPU%</TableHead>
+                  <TableHead className="text-text-muted text-xs py-1 text-right">RAM</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {top5.map((proc) => (
+                  <TableRow key={proc.pid} className="border-bg-elevated">
+                    <TableCell className="text-xs text-text-secondary truncate max-w-[200px] py-1.5">
+                      {proc.name}
+                    </TableCell>
+                    <TableCell
+                      className={`font-mono text-xs font-bold text-right py-1.5 ${
+                        proc.cpu >= 80
+                          ? 'text-status-critical'
+                          : proc.cpu >= 50
+                            ? 'text-gold-primary'
+                            : 'text-text-secondary'
+                      }`}
+                    >
+                      {proc.cpu.toFixed(1)}%
+                    </TableCell>
+                    <TableCell
+                      className={`font-mono text-xs font-bold text-right py-1.5 ${
+                        ramUnit === 'MB'
+                          ? proc.ram >= 1024
+                            ? 'text-gold-primary'
+                            : 'text-text-secondary'
+                          : proc.ram >= 80
+                            ? 'text-status-critical'
+                            : proc.ram >= 50
+                              ? 'text-gold-primary'
+                              : 'text-text-secondary'
+                      }`}
+                    >
+                      {ramUnit === 'MB' ? `${proc.ram.toLocaleString()} MB` : `${proc.ram.toFixed(1)}%`}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
     </div>
   );
@@ -502,35 +559,52 @@ function NetworkSection({ serverId }: { serverId: string }) {
 
           {/* Top 5 destinations */}
           {top5Dests.length > 0 && (
-            <Table>
-              <TableHeader>
-                <TableRow className="border-bg-elevated hover:bg-transparent">
-                  <TableHead className="text-text-muted text-xs py-1">Destination</TableHead>
-                  <TableHead className="text-text-muted text-xs py-1 text-right">Conns</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Mobile card view */}
+              <div className="sm:hidden space-y-1.5">
                 {top5Dests.map((dest) => (
-                  <TableRow key={dest.address} className="border-bg-elevated">
-                    <TableCell className="py-1.5">
-                      <div className="flex flex-col">
-                        {dest.hostname && (
-                          <span className="text-xs text-text-secondary leading-tight">
-                            {dest.hostname}
-                          </span>
-                        )}
-                        <span className="font-mono text-[11px] text-text-muted leading-tight">
-                          {dest.address}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-gold-primary font-bold text-right py-1.5">
-                      {dest.connections}
-                    </TableCell>
-                  </TableRow>
+                  <div key={dest.address} className="flex items-center justify-between border border-bg-elevated rounded-md px-2.5 py-1.5">
+                    <div className="min-w-0 mr-2">
+                      {dest.hostname && <div className="text-xs text-text-secondary truncate">{dest.hostname}</div>}
+                      <div className="font-mono text-[11px] text-text-muted truncate">{dest.address}</div>
+                    </div>
+                    <span className="font-mono text-xs text-gold-primary font-bold flex-shrink-0">{dest.connections}</span>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+              {/* Desktop table */}
+              <div className="hidden sm:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-bg-elevated hover:bg-transparent">
+                      <TableHead className="text-text-muted text-xs py-1">Destination</TableHead>
+                      <TableHead className="text-text-muted text-xs py-1 text-right">Conns</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {top5Dests.map((dest) => (
+                      <TableRow key={dest.address} className="border-bg-elevated">
+                        <TableCell className="py-1.5">
+                          <div className="flex flex-col">
+                            {dest.hostname && (
+                              <span className="text-xs text-text-secondary leading-tight">
+                                {dest.hostname}
+                              </span>
+                            )}
+                            <span className="font-mono text-[11px] text-text-muted leading-tight">
+                              {dest.address}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-gold-primary font-bold text-right py-1.5">
+                          {dest.connections}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </>
       )}

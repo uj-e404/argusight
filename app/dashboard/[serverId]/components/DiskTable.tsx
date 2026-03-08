@@ -57,7 +57,7 @@ export function DiskTable({ serverId }: DiskTableProps) {
   }
 
   return (
-    <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
+    <div className="bg-bg-surface border border-bg-elevated rounded-lg p-3 sm:p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -82,7 +82,43 @@ export function DiskTable({ serverId }: DiskTableProps) {
           No disk partitions found
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        {/* Mobile card view */}
+        <div className="sm:hidden space-y-2">
+          {disks.map((disk, i) => {
+            const smartStatus = getSmartStatus(disk.filesystem);
+            return (
+              <div key={`${disk.filesystem}-${i}`} className="border border-bg-elevated rounded-md p-3 space-y-2">
+                <div className="text-xs font-medium text-text-secondary font-mono truncate">{disk.filesystem}</div>
+                <div className="flex items-center gap-2">
+                  <StatusBar value={disk.usePercent} warn={70} critical={85} className="flex-1" />
+                  <span className={`font-mono text-xs font-bold min-w-[36px] text-right ${disk.usePercent >= 85 ? 'text-status-critical' : disk.usePercent >= 70 ? 'text-gold-primary' : 'text-status-healthy'}`}>
+                    {disk.usePercent}%
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-mono text-text-muted">
+                  <span>Size: {disk.size}</span>
+                  <span>Used: {disk.used}</span>
+                  <span>Avail: {disk.available}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] font-mono text-text-muted">
+                  <span>{disk.mountpoint}</span>
+                  {smart.length > 0 && smartStatus && (
+                    <Badge
+                      variant={smartStatus.healthy ? 'default' : 'destructive'}
+                      className={smartStatus.healthy ? 'bg-status-healthy/20 text-status-healthy border-0 text-[10px]' : 'text-[10px]'}
+                    >
+                      {smartStatus.status}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="border-bg-elevated hover:bg-transparent">
@@ -165,6 +201,7 @@ export function DiskTable({ serverId }: DiskTableProps) {
             </TableBody>
           </Table>
         </div>
+        </>
       )}
     </div>
   );

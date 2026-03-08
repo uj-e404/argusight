@@ -29,7 +29,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <main className="pt-14 xl:pl-[220px]">
-        <div className="p-4 md:p-6">{children}</div>
+        <div className="p-3 sm:p-4 md:p-6">{children}</div>
       </main>
     </div>
   );

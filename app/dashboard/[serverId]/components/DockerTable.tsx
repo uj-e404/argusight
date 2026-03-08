@@ -69,7 +69,7 @@ export function DockerTable({ serverId }: DockerTableProps) {
   }
 
   return (
-    <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
+    <div className="bg-bg-surface border border-bg-elevated rounded-lg p-3 sm:p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-text-primary">
@@ -83,45 +83,68 @@ export function DockerTable({ serverId }: DockerTableProps) {
           No containers found
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-bg-elevated hover:bg-transparent">
-                <TableHead className="text-text-muted text-xs">Name</TableHead>
-                <TableHead className="text-text-muted text-xs">Image</TableHead>
-                <TableHead className="text-text-muted text-xs">State</TableHead>
-                <TableHead className="text-text-muted text-xs">Status</TableHead>
-                <TableHead className="text-text-muted text-xs">Ports</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {containers.map((c) => (
-                <TableRow key={c.id} className="border-bg-elevated">
-                  <TableCell className="font-mono text-xs text-text-secondary font-semibold">
-                    {c.name}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-text-muted truncate max-w-[200px]">
-                    {c.image}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="default"
-                      className={`text-[10px] ${STATE_STYLES[c.state] || STATE_STYLES.created}`}
-                    >
-                      {c.state}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-xs text-text-muted">
-                    {c.status}
-                  </TableCell>
-                  <TableCell className="font-mono text-[10px] text-text-muted truncate max-w-[180px]">
-                    {c.ports || '-'}
-                  </TableCell>
+        <>
+          {/* Mobile card view */}
+          <div className="sm:hidden space-y-2">
+            {containers.map((c) => (
+              <div key={c.id} className="border border-bg-elevated rounded-md p-3 space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="font-mono text-xs text-text-secondary font-semibold truncate mr-2">{c.name}</span>
+                  <Badge
+                    variant="default"
+                    className={`text-[10px] flex-shrink-0 ${STATE_STYLES[c.state] || STATE_STYLES.created}`}
+                  >
+                    {c.state}
+                  </Badge>
+                </div>
+                <div className="font-mono text-[11px] text-text-muted truncate">{c.image}</div>
+                <div className="text-[11px] text-text-muted">{c.status}</div>
+                {c.ports && <div className="font-mono text-[10px] text-text-muted break-all">{c.ports}</div>}
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-bg-elevated hover:bg-transparent">
+                  <TableHead className="text-text-muted text-xs">Name</TableHead>
+                  <TableHead className="text-text-muted text-xs">Image</TableHead>
+                  <TableHead className="text-text-muted text-xs">State</TableHead>
+                  <TableHead className="text-text-muted text-xs">Status</TableHead>
+                  <TableHead className="text-text-muted text-xs">Ports</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {containers.map((c) => (
+                  <TableRow key={c.id} className="border-bg-elevated">
+                    <TableCell className="font-mono text-xs text-text-secondary font-semibold">
+                      {c.name}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-text-muted truncate max-w-[200px]">
+                      {c.image}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="default"
+                        className={`text-[10px] ${STATE_STYLES[c.state] || STATE_STYLES.created}`}
+                      >
+                        {c.state}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-text-muted">
+                      {c.status}
+                    </TableCell>
+                    <TableCell className="font-mono text-[10px] text-text-muted truncate max-w-[180px]">
+                      {c.ports || '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
     </div>
   );

@@ -312,7 +312,7 @@ export default function SetupWizardPage() {
       )}
 
       {/* Content */}
-      {ready && <div className="relative z-10 flex flex-col items-center gap-6 px-4 w-full max-w-2xl py-12">
+      {ready && <div className="relative z-10 flex flex-col items-center gap-6 px-4 w-full max-w-full sm:max-w-2xl py-12">
         {/* Logo */}
         <div className="animate-float">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -321,7 +321,7 @@ export default function SetupWizardPage() {
 
         {/* Title */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-text-primary">Welcome to ArguSight</h1>
+          <h1 className="text-xl sm:text-3xl font-bold text-text-primary">Welcome to ArguSight</h1>
           <p className="mt-2 text-sm text-text-muted">
             Let&apos;s get your monitoring dashboard set up.
           </p>
@@ -441,7 +441,7 @@ export default function SetupWizardPage() {
         {/* Step 2: Servers */}
         {step === 2 && (
           <div className="w-full space-y-4">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gold-primary/10 border border-gold-primary/20">
                   <Server size={20} className="text-gold-primary" />
@@ -504,7 +504,7 @@ export default function SetupWizardPage() {
                   {/* Expanded form */}
                   {expandedServer === i && (
                     <div className="px-4 pb-4 space-y-3 border-t border-bg-elevated">
-                      <div className="grid grid-cols-2 gap-3 pt-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
                         <div>
                           <label className="block text-xs font-medium text-text-secondary mb-1">Display Name</label>
                           <input
@@ -529,8 +529,8 @@ export default function SetupWizardPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="col-span-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="sm:col-span-2">
                           <label className="block text-xs font-medium text-text-secondary mb-1">Host / IP</label>
                           <input
                             type="text"

@@ -118,12 +118,12 @@ export function ServerDetailClient({ serverId, initialServer }: ServerDetailClie
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-2 sm:gap-3 mb-6">
         <Button
           variant="ghost"
           size="icon"
           onClick={() => startTransition(() => router.push('/dashboard'))}
-          className={`text-text-secondary hover:text-text-primary ${isPending ? 'opacity-60' : ''}`}
+          className={`text-text-secondary hover:text-text-primary flex-shrink-0 ${isPending ? 'opacity-60' : ''}`}
           disabled={isPending}
         >
           {isPending ? (
@@ -132,9 +132,9 @@ export function ServerDetailClient({ serverId, initialServer }: ServerDetailClie
             <ArrowLeft className="h-5 w-5" />
           )}
         </Button>
-        <div className="flex items-center gap-3">
-          <OsIcon type={server.type} size={20} className="text-text-muted" />
-          <h1 className="text-xl font-bold text-text-primary">{server.name}</h1>
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          <OsIcon type={server.type} size={20} className="text-text-muted flex-shrink-0" />
+          <h1 className="text-lg sm:text-xl font-bold text-text-primary truncate">{server.name}</h1>
           <Badge
             variant={isOnline ? 'default' : 'destructive'}
             className={isOnline ? 'bg-status-healthy/20 text-status-healthy border-0' : ''}
@@ -158,7 +158,7 @@ export function ServerDetailClient({ serverId, initialServer }: ServerDetailClie
 
       {/* Tabs */}
       <Tabs defaultValue={tabs[0]} className="w-full">
-        <TabsList className="bg-bg-surface border border-bg-elevated mb-4">
+        <TabsList className="bg-bg-surface border border-bg-elevated mb-4 w-full flex-wrap h-auto justify-start">
           {tabs.map((tab) => (
             <TabsTrigger
               key={tab}

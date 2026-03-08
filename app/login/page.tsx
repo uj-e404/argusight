@@ -78,21 +78,22 @@ export default function LoginPage() {
       <div className="absolute inset-0 grid-pattern" />
 
       {/* Login content */}
-      <div className="relative z-10 flex flex-col items-center gap-8 px-4">
+      <div className="relative z-10 flex flex-col items-center gap-5 sm:gap-8 px-4">
         {/* Eye logo */}
         <div className="animate-float">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/argusight-logo.svg"
             alt="ArguSight"
-            width={160}
-            height={160}
+            width={120}
+            height={120}
+            className="sm:w-[160px] sm:h-[160px]"
           />
         </div>
 
         {/* Wordmark */}
         <div className="text-center">
-          <h1 className="text-[56px] font-extrabold tracking-[6px] leading-none">
+          <h1 className="text-[36px] sm:text-[56px] font-extrabold tracking-[3px] sm:tracking-[6px] leading-none">
             <span className="text-text-primary">ARGU</span>
             <span className="text-gold-primary">SIGHT</span>
           </h1>
@@ -101,13 +102,13 @@ export default function LoginPage() {
           <div className="mx-auto mt-4 h-[2px] w-20 bg-gold-primary" />
 
           {/* Tagline */}
-          <p className="mt-3 text-xs font-normal tracking-[4px] text-text-muted">
+          <p className="mt-3 text-xs font-normal tracking-[2px] sm:tracking-[4px] text-text-muted">
             ALL SEEING INFRASTRUCTURE MONITORING
           </p>
         </div>
 
         {/* Login form */}
-        <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
+        <form onSubmit={handleSubmit} className="w-full max-w-[260px] sm:max-w-sm space-y-4">
           <div>
             <input
               type="text"

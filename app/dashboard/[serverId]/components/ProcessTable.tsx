@@ -139,13 +139,13 @@ export function ProcessTable({ serverId, serverType }: ProcessTableProps) {
   );
 
   return (
-    <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
+    <div className="bg-bg-surface border border-bg-elevated rounded-lg p-3 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
         <h3 className="text-sm font-semibold text-text-primary">
           Processes ({filtered.length})
         </h3>
-        <div className="relative w-60">
+        <div className="relative w-full sm:w-60">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" />
           <Input
             placeholder="Search by name, user, PID..."
@@ -156,8 +156,51 @@ export function ProcessTable({ serverId, serverType }: ProcessTableProps) {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
+      {/* Mobile card view */}
+      <div className="sm:hidden space-y-2">
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center py-8 text-text-muted text-sm">
+            <Cpu className="h-10 w-10 text-text-muted/30 mb-2" />
+            {search ? 'No matching processes' : 'No processes found'}
+          </div>
+        ) : (
+          filtered.map((proc) => (
+            <div key={proc.pid} className="border border-bg-elevated rounded-md p-3 space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-medium text-text-secondary truncate mr-2">{proc.name}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 flex-shrink-0 text-status-critical hover:text-status-critical hover:bg-status-critical/10"
+                  onClick={() => setConfirmKill({ pid: proc.pid, name: proc.name })}
+                  disabled={killingPid !== null}
+                >
+                  {killingPid === proc.pid ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <X className="h-3 w-3" />
+                  )}
+                </Button>
+              </div>
+              <div className="flex gap-3 text-[11px] font-mono text-text-muted">
+                <span>PID: {proc.pid}</span>
+                <span>{proc.user || '-'}</span>
+              </div>
+              <div className="flex gap-4 text-xs font-mono">
+                <span className={`font-bold ${proc.cpu >= 80 ? 'text-status-critical' : proc.cpu >= 50 ? 'text-gold-primary' : 'text-text-secondary'}`}>
+                  CPU: {proc.cpu.toFixed(1)}%
+                </span>
+                <span className={`font-bold ${ramUnit === 'MB' ? (proc.ram >= 1024 ? 'text-gold-primary' : 'text-text-secondary') : (proc.ram >= 80 ? 'text-status-critical' : proc.ram >= 50 ? 'text-gold-primary' : 'text-text-secondary')}`}>
+                  RAM: {ramUnit === 'MB' ? `${proc.ram.toLocaleString()} MB` : `${proc.ram.toFixed(1)}%`}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden sm:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="border-bg-elevated hover:bg-transparent">

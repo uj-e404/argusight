@@ -250,8 +250,8 @@ export function ServerFormDialog({ open, onOpenChange, mode, initialData, onSucc
           </div>
 
           {/* Host + Port */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2 space-y-1.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-2 space-y-1.5">
               <Label className="text-text-secondary text-xs">Host *</Label>
               <Input
                 value={form.host}

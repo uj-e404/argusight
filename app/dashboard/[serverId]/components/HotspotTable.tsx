@@ -147,8 +147,8 @@ export function HotspotTable({ serverId }: HotspotTableProps) {
     <div className="space-y-4">
       {/* Summary Bar */}
       <div className="bg-bg-surface border border-bg-elevated rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex gap-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap gap-3 sm:gap-8">
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-text-muted" />
               <span className="text-xs text-text-muted">Active Users</span>
@@ -204,8 +204,44 @@ export function HotspotTable({ serverId }: HotspotTableProps) {
       )}
 
       {/* Users Table */}
-      <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
-        <div className="overflow-x-auto">
+      <div className="bg-bg-surface border border-bg-elevated rounded-lg p-3 sm:p-6">
+        {/* Mobile card view */}
+        <div className="sm:hidden space-y-2">
+          {sortedUsers.length === 0 ? (
+            <div className="flex flex-col items-center py-8 text-text-muted text-sm">
+              <Users className="h-10 w-10 text-text-muted/30 mb-2" />
+              No active hotspot users
+            </div>
+          ) : (
+            sortedUsers.map((user) => (
+              <div key={user.user + user.macAddress} className="border border-bg-elevated rounded-md p-3 space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-medium text-text-secondary">{user.user || '-'}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-status-critical hover:text-status-critical hover:bg-status-critical/10"
+                    onClick={() => kickUser(user.user)}
+                    disabled={kicking !== null}
+                  >
+                    <UserX className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="flex gap-3 text-[11px] font-mono text-text-muted">
+                  <span>{user.address}</span>
+                  <span>{user.uptime || '-'}</span>
+                </div>
+                <div className="flex gap-4 text-xs font-mono">
+                  <span className={rateColor(user.rateIn)}>DL: {formatRate(user.rateIn)}</span>
+                  <span className={rateColor(user.rateOut)}>UL: {formatRate(user.rateOut)}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="border-bg-elevated hover:bg-transparent">

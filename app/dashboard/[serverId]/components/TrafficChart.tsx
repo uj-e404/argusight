@@ -79,24 +79,24 @@ export function TrafficChart({ serverId }: TrafficChartProps) {
   }));
 
   return (
-    <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
+    <div className="bg-bg-surface border border-bg-elevated rounded-lg p-3 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex gap-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div className="flex gap-4 sm:gap-8">
           <div>
             <div className="text-xs text-text-muted mb-1">Download (RX)</div>
-            <div className="font-mono text-2xl font-bold text-status-info">
+            <div className="font-mono text-lg sm:text-2xl font-bold text-status-info">
               {loading || !latest ? '--' : formatBandwidth(latest.rxBps)}
             </div>
           </div>
           <div>
             <div className="text-xs text-text-muted mb-1">Upload (TX)</div>
-            <div className="font-mono text-2xl font-bold text-status-healthy">
+            <div className="font-mono text-lg sm:text-2xl font-bold text-status-healthy">
               {loading || !latest ? '--' : formatBandwidth(latest.txBps)}
             </div>
           </div>
         </div>
-        <div className="w-48">
+        <div className="w-full sm:w-48">
           <Select value={selectedInterface} onValueChange={handleInterfaceChange}>
             <SelectTrigger className="h-8 text-xs bg-bg-dark border-bg-elevated">
               <SelectValue placeholder="Select interface" />

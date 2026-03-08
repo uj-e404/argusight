@@ -39,7 +39,7 @@ export function WindowsNetworkTab({ serverId }: WindowsNetworkTabProps) {
     <div className="space-y-6">
       {/* Summary Bar */}
       <div className="bg-bg-surface border border-bg-elevated rounded-lg p-4">
-        <div className="flex gap-8">
+        <div className="flex flex-wrap gap-3 sm:gap-8">
           <div className="flex items-center gap-2">
             <Network className="h-4 w-4 text-text-muted" />
             <span className="text-xs text-text-muted">Connections</span>
@@ -107,15 +107,15 @@ function ProcessSection({ processes, loading }: { processes: WindowsNetProcess[]
   );
 
   return (
-    <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-bg-surface border border-bg-elevated rounded-lg p-3 sm:p-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div className="flex items-center gap-2">
           <AppWindow className="h-4 w-4 text-text-muted" />
           <h3 className="text-sm font-semibold text-text-primary">
             Top Network Processes ({filtered.length})
           </h3>
         </div>
-        <div className="relative w-60">
+        <div className="relative w-full sm:w-60">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" />
           <Input
             placeholder="Search process or PID..."
@@ -126,7 +126,37 @@ function ProcessSection({ processes, loading }: { processes: WindowsNetProcess[]
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Mobile card view */}
+      <div className="sm:hidden space-y-2">
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center py-8 text-text-muted text-sm">
+            <AppWindow className="h-10 w-10 text-text-muted/30 mb-2" />
+            {search ? 'No matching processes' : 'No process data available'}
+          </div>
+        ) : (
+          filtered.map((proc, i) => (
+            <div key={proc.pid} className="border border-bg-elevated rounded-md p-3 space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-medium text-text-primary">{proc.name}</span>
+                <span className="font-mono text-xs text-gold-primary font-bold">{proc.connections} conn</span>
+              </div>
+              <div className="flex gap-3 text-[11px] font-mono text-text-muted">
+                <span>#{i + 1}</span>
+                <span>PID: {proc.pid}</span>
+              </div>
+              {proc.remoteAddresses.length > 0 && (
+                <div className="font-mono text-[10px] text-text-muted break-all">
+                  {proc.remoteAddresses.slice(0, 3).join(', ')}
+                  {proc.remoteAddresses.length > 3 && ` +${proc.remoteAddresses.length - 3}`}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden sm:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="border-bg-elevated hover:bg-transparent">
@@ -216,15 +246,15 @@ function DestinationSection({ destinations, loading }: { destinations: WindowsNe
   );
 
   return (
-    <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-bg-surface border border-bg-elevated rounded-lg p-3 sm:p-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div className="flex items-center gap-2">
           <Globe className="h-4 w-4 text-text-muted" />
           <h3 className="text-sm font-semibold text-text-primary">
             Live Destinations ({filtered.length})
           </h3>
         </div>
-        <div className="relative w-60">
+        <div className="relative w-full sm:w-60">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" />
           <Input
             placeholder="Search IP, hostname, or process..."
@@ -235,7 +265,34 @@ function DestinationSection({ destinations, loading }: { destinations: WindowsNe
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Mobile card view */}
+      <div className="sm:hidden space-y-2">
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center py-8 text-text-muted text-sm">
+            <Globe className="h-10 w-10 text-text-muted/30 mb-2" />
+            {search ? 'No matching destinations' : 'No destination data available'}
+          </div>
+        ) : (
+          filtered.map((dest) => (
+            <div key={dest.address} className="border border-bg-elevated rounded-md p-3 space-y-1.5">
+              <div className="flex justify-between items-center">
+                <div className="min-w-0 mr-2">
+                  {dest.hostname && <div className="text-xs font-medium text-text-secondary truncate">{dest.hostname}</div>}
+                  <div className="font-mono text-[11px] text-text-muted">{dest.address}</div>
+                </div>
+                <span className="font-mono text-xs text-gold-primary font-bold flex-shrink-0">{dest.connections}</span>
+              </div>
+              <div className="flex gap-3 text-[11px] text-text-muted">
+                <span>Port: {dest.port}</span>
+                <span className="truncate">{dest.processes.join(', ')}</span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden sm:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="border-bg-elevated hover:bg-transparent">

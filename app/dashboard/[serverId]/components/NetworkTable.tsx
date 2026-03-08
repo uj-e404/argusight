@@ -123,7 +123,7 @@ export function NetworkTable({ serverId }: NetworkTableProps) {
     <div className="space-y-4">
       {/* Summary Bar */}
       <div className="bg-bg-surface border border-bg-elevated rounded-lg p-4">
-        <div className="flex gap-8">
+        <div className="flex flex-wrap gap-3 sm:gap-8">
           <div className="flex items-center gap-2">
             <Network className="h-4 w-4 text-text-muted" />
             <span className="text-xs text-text-muted">Clients</span>
@@ -143,12 +143,12 @@ export function NetworkTable({ serverId }: NetworkTableProps) {
       </div>
 
       {/* Client Table */}
-      <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-bg-surface border border-bg-elevated rounded-lg p-3 sm:p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
           <h3 className="text-sm font-semibold text-text-primary">
             Network Clients ({filtered.length})
           </h3>
-          <div className="relative w-60">
+          <div className="relative w-full sm:w-60">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" />
             <Input
               placeholder="Search hostname, IP, or MAC..."
@@ -159,7 +159,37 @@ export function NetworkTable({ serverId }: NetworkTableProps) {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile card view */}
+        <div className="sm:hidden space-y-2">
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center py-8 text-text-muted text-sm">
+              <Network className="h-10 w-10 text-text-muted/30 mb-2" />
+              {search ? 'No matching clients' : 'No network data available'}
+            </div>
+          ) : (
+            filtered.map((client) => (
+              <div key={client.ip} className="border border-bg-elevated rounded-md p-3 space-y-1.5">
+                <div className="flex justify-between items-start">
+                  <div className="min-w-0">
+                    {(client.label || client.hostname) && (
+                      <div className="text-xs font-medium text-text-secondary truncate">{client.label || client.hostname}</div>
+                    )}
+                    <div className="font-mono text-[11px] text-text-muted">{client.ip}</div>
+                  </div>
+                  <span className="font-mono text-xs text-gold-primary font-bold flex-shrink-0 ml-2">{client.connections.toLocaleString()} dest</span>
+                </div>
+                <div className="font-mono text-[11px] text-text-muted">{client.mac || '-'}</div>
+                <div className="flex gap-4 text-xs font-mono">
+                  <span className={rateColor(client.rateIn)}>DL: {formatRate(client.rateIn)}</span>
+                  <span className={rateColor(client.rateOut)}>UL: {formatRate(client.rateOut)}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="border-bg-elevated hover:bg-transparent">

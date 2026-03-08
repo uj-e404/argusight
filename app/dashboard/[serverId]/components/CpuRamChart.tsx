@@ -51,19 +51,19 @@ export function CpuRamChart({ serverId }: CpuRamChartProps) {
   }));
 
   return (
-    <div className="bg-bg-surface border border-bg-elevated rounded-lg p-6">
+    <div className="bg-bg-surface border border-bg-elevated rounded-lg p-3 sm:p-6">
       {/* Current values + timezone label */}
-      <div className="flex items-end justify-between mb-6">
-        <div className="flex gap-8">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between mb-6">
+        <div className="flex gap-4 sm:gap-8">
           <div>
             <div className="text-xs text-text-muted mb-1">CPU</div>
-            <div className="font-mono text-[32px] font-bold text-status-info">
+            <div className="font-mono text-xl sm:text-[32px] font-bold text-status-info">
               {loading ? '--' : latest ? `${latest.cpu}%` : '--'}
             </div>
           </div>
           <div>
             <div className="text-xs text-text-muted mb-1">RAM</div>
-            <div className="font-mono text-[32px] font-bold text-gold-primary">
+            <div className="font-mono text-xl sm:text-[32px] font-bold text-gold-primary">
               {loading ? '--' : latest ? `${latest.ram}%` : '--'}
             </div>
           </div>

@@ -74,7 +74,7 @@ export default function SetupCredentialsPage() {
       <div className="absolute inset-0 grid-pattern" />
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center gap-6 px-4 w-full max-w-sm">
+      <div className="relative z-10 flex flex-col items-center gap-6 px-4 w-full max-w-[260px] sm:max-w-sm">
         {/* Icon */}
         <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gold-primary/10 border border-gold-primary/20">
           <ShieldCheck size={32} className="text-gold-primary" />
@@ -82,7 +82,7 @@ export default function SetupCredentialsPage() {
 
         {/* Title */}
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-text-primary">Set Up Your Credentials</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Set Up Your Credentials</h1>
           <p className="mt-2 text-sm text-text-muted leading-relaxed">
             Choose a new username and password for your account.
             <br />
