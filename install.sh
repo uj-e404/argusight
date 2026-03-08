@@ -59,14 +59,14 @@ docker buildx build \
 echo ""
 echo "Build complete!"
 
-# Clean up builder
+# Clean up builder (non-critical, don't let it stop the script)
 docker buildx rm "$BUILDER_NAME" 2>/dev/null || true
+# Restore default builder
+docker buildx use default 2>/dev/null || true
 
-# Update docker-compose to use local image
-if grep -q "build:" docker-compose.yml 2>/dev/null; then
-  # Replace build directive with local image reference
-  sed -i 's|^\(\s*\)build: \.|\1image: argusight:latest\n\1# build: .|' docker-compose.yml 2>/dev/null || true
-fi
+# Update docker-compose to use locally built image instead of GHCR
+sed -i 's|image: ghcr.io/uj-e404/argusight:latest|image: argusight:latest|' docker-compose.yml
+echo "Updated docker-compose.yml to use local image"
 
 # Start the container
 echo "Starting ArguSight..."
