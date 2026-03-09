@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import packageJson from '@/package.json';
 
+export const dynamic = 'force-dynamic';
+
 const GITHUB_REPO = 'uj-e404/argusight';
 const CACHE_TTL = 3600_000; // 1 hour
 
