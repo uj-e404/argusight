@@ -1,0 +1,21 @@
+{
+  "name": "ArguSight",
+  "short_name": "ArguSight",
+  "description": "All-Seeing Infrastructure Monitoring",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0F1117",
+  "theme_color": "#D4A853",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

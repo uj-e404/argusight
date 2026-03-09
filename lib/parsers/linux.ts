@@ -102,7 +102,11 @@ export function parseDockerPs(raw: string): DockerContainer[] {
 
 export function parseUptime(raw: string): string {
   // Input from: uptime -s → "2024-01-15 10:30:00"
-  return raw.trim();
+  // Reformat to dd-MM-yyyy HH:mm:ss
+  const trimmed = raw.trim();
+  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})\s+(.+)$/);
+  if (match) return `${match[3]}-${match[2]}-${match[1]} ${match[4]}`;
+  return trimmed;
 }
 
 export function parseGpuInfo(raw: string): GpuInfo | null {

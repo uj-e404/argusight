@@ -158,7 +158,7 @@ export function ServerDetailClient({ serverId, initialServer }: ServerDetailClie
 
       {/* Tabs */}
       <Tabs defaultValue={tabs[0]} className="w-full">
-        <TabsList className="bg-bg-surface border border-bg-elevated mb-4 w-full flex-wrap h-auto justify-start">
+        <TabsList className="bg-bg-surface border border-bg-elevated mb-4 w-full flex-wrap !h-auto justify-start">
           {tabs.map((tab) => (
             <TabsTrigger
               key={tab}

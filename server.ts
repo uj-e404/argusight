@@ -84,6 +84,19 @@ const handle = app.getRequestHandler();
 
 app.prepare().then(async () => {
   const server = createServer((req, res) => {
+    const url = req.url || '/';
+
+    // Service worker: always serve fresh (no cache)
+    if (url === '/sw.js') {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Service-Worker-Allowed', '/');
+    }
+
+    // Icons and static assets: cache for 1 year
+    if (url.startsWith('/icons/')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+
     handle(req, res);
   });
 

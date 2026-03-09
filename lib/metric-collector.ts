@@ -164,22 +164,23 @@ async function pollOneServer(config: ServerConfig): Promise<void> {
         sshPool.exec(config.id, 'powershell -Command "Get-CimInstance Win32_Processor | Select-Object -ExpandProperty LoadPercentage"'),
         sshPool.exec(config.id, 'powershell -Command "Get-CimInstance Win32_OperatingSystem | Select-Object TotalVisibleMemorySize,FreePhysicalMemory | ConvertTo-Json"'),
         sshPool.exec(config.id, 'powershell -Command "Get-Volume | Select-Object DriveLetter,FileSystem,Size,SizeRemaining | ConvertTo-Json"'),
+        sshPool.exec(config.id, 'powershell -Command "(Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToString(\'yyyy-MM-dd HH:mm:ss\')"'),
       ];
       const hasNetwork = config.features?.includes('network');
       if (hasNetwork) commands.push(sshPool.exec(config.id, 'powershell -Command "Get-NetAdapterStatistics | Select-Object ReceivedBytes,SentBytes | ConvertTo-Json"'));
 
       const results = await Promise.all(commands);
-      const [cpuRaw, memRaw, diskRaw] = results;
+      const [cpuRaw, memRaw, diskRaw, uptimeRaw] = results;
       data.cpu = parseCpuWindows(cpuRaw);
       const mem = parseMemoryWindows(memRaw);
       data.ram = mem.percent;
       const disks = parseDiskWindows(diskRaw);
       data.disk = disks.length > 0 ? Math.max(...disks.map((d) => d.usePercent)) : 0;
-      data.uptime = '';
+      data.uptime = parseUptime(uptimeRaw);
 
-      if (hasNetwork && results[3]) {
+      if (hasNetwork && results[4]) {
         try {
-          const statsData = JSON.parse(results[3]);
+          const statsData = JSON.parse(results[4]);
           const adapters: { ReceivedBytes: number; SentBytes: number }[] = Array.isArray(statsData) ? statsData : [statsData];
           let totalRx = 0;
           let totalTx = 0;

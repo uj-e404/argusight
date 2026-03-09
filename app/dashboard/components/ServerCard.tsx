@@ -76,12 +76,15 @@ export function ServerCard({ server, onEdit, onDelete }: ServerCardProps) {
         </div>
       </div>
 
-      {/* IP + OS */}
+      {/* IP + OS + Specs */}
       <div className="mb-2.5">
         <p className="font-mono text-[10px] text-text-muted leading-tight">{server.host}</p>
         {server.os && (
           <p className="font-mono text-[10px] text-text-muted leading-tight">{server.os}</p>
         )}
+        {server.specs && Object.entries(server.specs).map(([k, v]) => (
+          <p key={k} className="font-mono text-[10px] text-text-muted leading-tight">{k}: {v}</p>
+        ))}
       </div>
 
       {/* Metrics */}
