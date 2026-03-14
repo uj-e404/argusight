@@ -19,6 +19,7 @@ import { DomainTable } from './components/DomainTable';
 import { HotspotTable } from './components/HotspotTable';
 import { NetworkTable } from './components/NetworkTable';
 import { WindowsNetworkTab } from './components/WindowsNetworkTab';
+import { SpikeMonitor } from './components/SpikeMonitor';
 import { useWebSocket } from '@/hooks/WebSocketProvider';
 import type { OverviewServerData } from '@/lib/types';
 
@@ -48,6 +49,7 @@ function buildTabs(server: ServerInfo): string[] {
     if (server.features?.includes('domains')) tabs.push('Domains');
     if (server.features?.includes('hotspot')) tabs.push('Hotspot');
     if (server.features?.includes('network')) tabs.push('Network');
+    if (server.features?.includes('spike')) tabs.push('Spike');
     return tabs;
   }
   // Linux/Windows: All Status first
@@ -221,6 +223,11 @@ export function ServerDetailClient({ serverId, initialServer }: ServerDetailClie
         {tabs.includes('Hotspot') && (
           <TabsContent value="Hotspot">
             <HotspotTable serverId={serverId} />
+          </TabsContent>
+        )}
+        {tabs.includes('Spike') && (
+          <TabsContent value="Spike">
+            <SpikeMonitor serverId={serverId} />
           </TabsContent>
         )}
         {tabs.includes('Network') && (

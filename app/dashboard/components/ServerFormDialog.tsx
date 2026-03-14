@@ -43,7 +43,7 @@ interface ServerFormData {
 const FEATURES_BY_TYPE: Record<ServerType, string[]> = {
   linux: ['cpu', 'ram', 'disk', 'processes', 'docker', 'gpu', 'network'],
   windows: ['cpu', 'ram', 'disk', 'processes', 'gpu', 'network'],
-  mikrotik: ['cpu', 'ram', 'traffic', 'domains', 'hotspot'],
+  mikrotik: ['cpu', 'ram', 'traffic', 'domains', 'hotspot', 'network', 'spike'],
 };
 
 const DEFAULT_FORM: ServerFormData = {
