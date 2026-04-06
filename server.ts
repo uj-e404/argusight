@@ -7,7 +7,8 @@ import { jwtVerify } from 'jose';
 import { sshPool } from './lib/ssh-pool';
 import { logger } from './lib/logger';
 import { setBroadcast } from './lib/broadcast';
-import { startMetricCollector, stopMetricCollector, getRingBuffer, getTrafficBuffer, getHotspotCache, getNetworkCache, getWindowsNetCache, clearTrafficBuffer } from './lib/metric-collector';
+import { startMetricCollector, stopMetricCollector, getRingBuffer, getTrafficBuffer, getHotspotCache, getNetworkCache, getWindowsNetCache, clearTrafficBuffer, getSpikeEventsForBackfill } from './lib/metric-collector';
+import { closeDb } from './lib/db';
 import type { ServersConfig, AuthConfig, ClientMessage } from './lib/types';
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -284,6 +285,21 @@ app.prepare().then(async () => {
               }));
             }
           }
+
+          // Send spike history backfill from SQLite
+          if (msg.channel.endsWith(':spikes')) {
+            const serverId = msg.channel.split(':')[1];
+            const events = getSpikeEventsForBackfill(serverId);
+            if (events.length > 0) {
+              ws.send(JSON.stringify({
+                type: 'spikes',
+                serverId,
+                data: events,
+                timestamp: new Date().toISOString(),
+                backfill: true,
+              }));
+            }
+          }
         } else if (msg.type === 'unsubscribe') {
           subs.delete(msg.channel);
         }
@@ -345,6 +361,7 @@ app.prepare().then(async () => {
     logger.info('server', 'Shutting down...');
     clearInterval(heartbeatInterval);
     stopMetricCollector();
+    closeDb();
     sshPool.disconnectAll();
     wss.clients.forEach((ws) => ws.close());
     wss.close();

@@ -30,8 +30,7 @@ import { useSpikeMonitor } from '@/hooks/useSpikeMonitor';
 import { useWebSocket } from '@/hooks/WebSocketProvider';
 import { usePolling } from './usePolling';
 import { formatBps } from '@/lib/format';
-import type { NetworkClient, MikroTikInterface } from '@/lib/types';
-import type { SpikeEvent } from '@/hooks/useSpikeMonitor';
+import type { NetworkClient, MikroTikInterface, SpikeEvent } from '@/lib/types';
 
 interface SpikeMonitorProps {
   serverId: string;

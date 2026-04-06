@@ -37,7 +37,7 @@ import { useServerHotspot } from '@/hooks/useServerHotspot';
 import { useServerNetwork } from '@/hooks/useServerNetwork';
 import { useWebSocket } from '@/hooks/WebSocketProvider';
 import { useSpikeMonitor } from '@/hooks/useSpikeMonitor';
-import type { SpikeEvent } from '@/hooks/useSpikeMonitor';
+import type { SpikeEvent } from '@/lib/types';
 import {
   Dialog,
   DialogContent,

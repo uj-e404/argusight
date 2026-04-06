@@ -2,122 +2,89 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWebSocket } from './WebSocketProvider';
-import type { NetworkClient, TrafficPoint } from '@/lib/types';
+import type { NetworkClient, TrafficPoint, SpikeEvent, SpikeConfig } from '@/lib/types';
 
-export interface SpikeConsumer {
-  ip: string;
-  label: string;
-  rateIn: number;
-  rateOut: number;
-}
-
-export interface SpikeEvent {
-  id: string;
-  timestamp: string;
-  type: 'personal' | 'all';
-  ip: string;
-  label: string;
-  peakRateIn: number;
-  peakRateOut: number;
-  totalRxBps?: number;
-  totalTxBps?: number;
-  topConsumers?: SpikeConsumer[];
-}
-
-interface SpikeConfig {
-  personalThresholdMbps: number;
-  allThresholdMbps: number;
-}
+export type { SpikeEvent, SpikeConsumer, SpikeConfig } from '@/lib/types';
 
 const DEFAULT_CONFIG: SpikeConfig = {
   personalThresholdMbps: 5,
   allThresholdMbps: 50,
 };
 
-const MAX_HISTORY = 50;
-
-function loadConfig(serverId: string): SpikeConfig {
-  if (typeof window === 'undefined') return DEFAULT_CONFIG;
-  try {
-    const raw = localStorage.getItem(`argusight:spike:${serverId}`);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return {
-        personalThresholdMbps: parsed.personalThresholdMbps ?? DEFAULT_CONFIG.personalThresholdMbps,
-        allThresholdMbps: parsed.allThresholdMbps ?? DEFAULT_CONFIG.allThresholdMbps,
-      };
-    }
-  } catch { /* ignore */ }
-  return DEFAULT_CONFIG;
-}
-
-function saveConfig(serverId: string, config: SpikeConfig) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(`argusight:spike:${serverId}`, JSON.stringify(config));
-}
-
-function loadHistory(serverId: string): SpikeEvent[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(`argusight:spike-history:${serverId}`);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return [];
-}
-
-function saveHistory(serverId: string, history: SpikeEvent[]) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(`argusight:spike-history:${serverId}`, JSON.stringify(history));
-}
-
 export function useSpikeMonitor(serverId: string) {
-  const [config, setConfigState] = useState<SpikeConfig>(() => loadConfig(serverId));
+  const [config, setConfigState] = useState<SpikeConfig>(DEFAULT_CONFIG);
   const [clients, setClients] = useState<NetworkClient[]>([]);
   const [activePersonalSpikes, setActivePersonalSpikes] = useState<NetworkClient[]>([]);
   const [isAllTrafficSpike, setIsAllTrafficSpike] = useState(false);
   const [allTrafficBreakdown, setAllTrafficBreakdown] = useState<NetworkClient[]>([]);
   const [currentRxBps, setCurrentRxBps] = useState(0);
   const [currentTxBps, setCurrentTxBps] = useState(0);
-  const [spikeHistory, setSpikeHistory] = useState<SpikeEvent[]>(() => loadHistory(serverId));
+  const [spikeHistory, setSpikeHistory] = useState<SpikeEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   const { subscribe, unsubscribe, onReconnect, offReconnect } = useWebSocket();
 
-  // Refs for cross-callback access
   const configRef = useRef(config);
   const clientsRef = useRef<NetworkClient[]>([]);
-  const prevSpikeIpsRef = useRef<Set<string>>(new Set());
-  const prevAllSpikeRef = useRef(false);
-  const historyRef = useRef(spikeHistory);
-  // Pending all-traffic spike: wait for network data with real rates before logging
-  const pendingAllSpikeRef = useRef<{ rxBps: number; txBps: number; iface: string } | null>(null);
-
-  // Keep refs in sync
   configRef.current = config;
-  historyRef.current = spikeHistory;
 
+  // Fetch config from API on mount / serverId change
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/servers/${serverId}/spikes/config`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!cancelled && data) {
+          setConfigState(data);
+          configRef.current = data;
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [serverId]);
+
+  // Fetch history from API on mount / serverId change
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/servers/${serverId}/spikes?limit=200`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!cancelled && data?.events) {
+          setSpikeHistory(data.events);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [serverId]);
+
+  // Save config via API
   const setConfig = useCallback((newConfig: SpikeConfig) => {
     setConfigState(newConfig);
     configRef.current = newConfig;
-    saveConfig(serverId, newConfig);
+    fetch(`/api/servers/${serverId}/spikes/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newConfig),
+    }).catch(() => {});
   }, [serverId]);
 
-  const addToHistory = useCallback((event: SpikeEvent) => {
-    setSpikeHistory(prev => {
-      const next = [event, ...prev].slice(0, MAX_HISTORY);
-      saveHistory(serverId, next);
-      historyRef.current = next;
-      return next;
-    });
-  }, [serverId]);
-
+  // Clear history via API
   const clearHistory = useCallback(() => {
     setSpikeHistory([]);
-    historyRef.current = [];
-    saveHistory(serverId, []);
+    fetch(`/api/servers/${serverId}/spikes`, { method: 'DELETE' }).catch(() => {});
   }, [serverId]);
 
-  // Handle network data
+  // Handle spike events from server (real-time + backfill)
+  const handleSpikes = useCallback((msg: unknown) => {
+    const m = msg as { data: SpikeEvent | SpikeEvent[]; backfill?: boolean };
+    if (m.backfill && Array.isArray(m.data)) {
+      setSpikeHistory(m.data);
+    } else if (!Array.isArray(m.data) && m.data?.id) {
+      setSpikeHistory((prev) => [m.data as SpikeEvent, ...prev].slice(0, 200));
+    }
+  }, []);
+
+  // Handle network data — for live display only (active spike indicators)
   const handleNetwork = useCallback((msg: unknown) => {
     const m = msg as { data: { clients: NetworkClient[] } };
     if (!m.data?.clients) return;
@@ -130,66 +97,15 @@ export function useSpikeMonitor(serverId: string) {
     const cfg = configRef.current;
     const thresholdBps = cfg.personalThresholdMbps * 1_000_000;
 
-    // Detect personal spikes
-    const spiking = networkClients.filter(c => {
+    const spiking = networkClients.filter((c) => {
       const totalBps = (c.rateIn + c.rateOut) * 8;
       return totalBps > thresholdBps;
     });
 
     setActivePersonalSpikes(spiking);
+  }, []);
 
-    // Dedup for history: only log new spikes
-    const currentSpikeIps = new Set(spiking.map(c => c.ip));
-    const prevIps = prevSpikeIpsRef.current;
-
-    for (const client of spiking) {
-      if (!prevIps.has(client.ip)) {
-        addToHistory({
-          id: `${Date.now()}-${client.ip}`,
-          timestamp: new Date().toISOString(),
-          type: 'personal',
-          ip: client.ip,
-          label: client.label || client.hostname || client.ip,
-          peakRateIn: client.rateIn,
-          peakRateOut: client.rateOut,
-        });
-      }
-    }
-
-    prevSpikeIpsRef.current = currentSpikeIps;
-
-    // Flush pending all-traffic spike now that we have real client rates
-    const pending = pendingAllSpikeRef.current;
-    if (pending) {
-      const hasRates = networkClients.some(c => c.rateIn > 0 || c.rateOut > 0);
-      if (hasRates) {
-        const sorted = [...networkClients].sort((a, b) =>
-          (b.rateIn + b.rateOut) - (a.rateIn + a.rateOut)
-        );
-        const consumers = sorted.slice(0, 10).map(c => ({
-          ip: c.ip,
-          label: c.label || c.hostname || c.ip,
-          rateIn: c.rateIn,
-          rateOut: c.rateOut,
-        }));
-        addToHistory({
-          id: `${Date.now()}-all`,
-          timestamp: new Date().toISOString(),
-          type: 'all',
-          ip: '',
-          label: `Interface: ${pending.iface}`,
-          peakRateIn: 0,
-          peakRateOut: 0,
-          totalRxBps: pending.rxBps,
-          totalTxBps: pending.txBps,
-          topConsumers: consumers,
-        });
-        pendingAllSpikeRef.current = null;
-      }
-    }
-  }, [addToHistory]);
-
-  // Handle traffic data
+  // Handle traffic data — for live display only
   const handleTraffic = useCallback((msg: unknown) => {
     const m = msg as { data: TrafficPoint | TrafficPoint[]; backfill?: boolean };
 
@@ -214,28 +130,21 @@ export function useSpikeMonitor(serverId: string) {
     setIsAllTrafficSpike(isSpiking);
 
     if (isSpiking) {
-      // Sort clients by total rate desc for breakdown
       const sorted = [...clientsRef.current].sort((a, b) =>
         (b.rateIn + b.rateOut) - (a.rateIn + a.rateOut)
       );
       setAllTrafficBreakdown(sorted);
-
-      // Mark pending if entering spike state — actual logging happens in handleNetwork
-      // when we have fresh client rates
-      if (!prevAllSpikeRef.current) {
-        pendingAllSpikeRef.current = {
-          rxBps: point.rxBps,
-          txBps: point.txBps,
-          iface: point.interface,
-        };
-      }
     } else {
       setAllTrafficBreakdown([]);
-      pendingAllSpikeRef.current = null;
     }
+  }, []);
 
-    prevAllSpikeRef.current = isSpiking;
-  }, [addToHistory]);
+  // Subscribe to spikes channel
+  useEffect(() => {
+    const channel = `server:${serverId}:spikes`;
+    subscribe(channel, handleSpikes);
+    return () => unsubscribe(channel, handleSpikes);
+  }, [serverId, subscribe, unsubscribe, handleSpikes]);
 
   // Subscribe to network channel
   useEffect(() => {
@@ -253,26 +162,21 @@ export function useSpikeMonitor(serverId: string) {
     return () => unsubscribe(channel, handleTraffic);
   }, [serverId, subscribe, unsubscribe, handleTraffic]);
 
-  // Handle WS reconnect
+  // Handle WS reconnect — refetch data
   useEffect(() => {
     const handleReconnect = () => {
       setLoading(true);
-      prevSpikeIpsRef.current = new Set();
-      prevAllSpikeRef.current = false;
+      // Refetch history after reconnect
+      fetch(`/api/servers/${serverId}/spikes?limit=200`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (data?.events) setSpikeHistory(data.events);
+        })
+        .catch(() => {});
     };
     onReconnect(handleReconnect);
     return () => offReconnect(handleReconnect);
-  }, [onReconnect, offReconnect]);
-
-  // Reload config/history when serverId changes
-  useEffect(() => {
-    const cfg = loadConfig(serverId);
-    setConfigState(cfg);
-    configRef.current = cfg;
-    const hist = loadHistory(serverId);
-    setSpikeHistory(hist);
-    historyRef.current = hist;
-  }, [serverId]);
+  }, [serverId, onReconnect, offReconnect]);
 
   return {
     config,

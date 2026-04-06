@@ -41,6 +41,7 @@ yarn-error.log*
 config/servers.json
 config/auth.json
 config/keys/
+config/data/
 
 # typescript
 *.tsbuildinfo

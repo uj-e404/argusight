@@ -9,7 +9,7 @@ COPY package.json pnpm-lock.yaml ./
 # pnpm postinstall scripts crash in Docker due to a bug in pnpm's
 # createLineStream (readStream must be readable). Workaround: install
 # with --ignore-scripts, prebuilt binaries are already downloaded.
-RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN pnpm install --frozen-lockfile --ignore-scripts && pnpm rebuild better-sqlite3
 
 # Stage 2: Build
 # --webpack flag forces Webpack compiler instead of SWC, avoiding the
@@ -38,7 +38,7 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.ts ./
 
-RUN chmod -R a+r public/ && mkdir -p config && chown node:node config
+RUN chmod -R a+r public/ && mkdir -p config/data && chown -R node:node config
 
 USER node
 

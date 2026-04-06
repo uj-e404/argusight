@@ -103,6 +103,12 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
           const cbs = callbacksRef.current.get(channel);
           cbs?.forEach((cb) => cb(msg));
         }
+        // For spike messages (server:{id}:spikes)
+        if (msg.type === 'spikes' && msg.serverId) {
+          const channel = `server:${msg.serverId}:spikes`;
+          const cbs = callbacksRef.current.get(channel);
+          cbs?.forEach((cb) => cb(msg));
+        }
       } catch {
         // ignore malformed messages
       }

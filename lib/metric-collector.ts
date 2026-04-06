@@ -8,7 +8,8 @@ import { parseCpuWindows, parseMemoryWindows, parseDiskWindows, parseWindowsNetS
 import { parseMikroTikResource, parseMikroTikTraffic, parseMikroTikHotspotDetail, parseMikroTikHotspotStats } from './parsers/mikrotik';
 import { collectNetworkData, clearDestAccumulator } from './network-collector';
 import { resolveMany } from './dns-cache';
-import type { ServerConfig, OverviewServerData, CpuRamData, TrafficPoint, MikroTikHotspotUser, NetworkClient, WindowsNetData } from './types';
+import { insertSpikeEvent, getSpikeConfig as dbGetSpikeConfig, getRecentSpikeEvents } from './db';
+import type { ServerConfig, OverviewServerData, CpuRamData, TrafficPoint, MikroTikHotspotUser, NetworkClient, WindowsNetData, SpikeEvent, SpikeConfig, SpikeConsumer } from './types';
 
 const OVERVIEW_INTERVAL = 5000;
 const DETAIL_INTERVAL = 2000;
@@ -40,6 +41,108 @@ const previousOverviewBandwidth = new Map<string, { receivedBytes: number; sentB
 let getSubscribersFn: (() => Map<WebSocket, Set<string>>) | null = null;
 let getInterfaceSelectionFn: ((serverId: string) => string | undefined) | null = null;
 let serverConfigs: ServerConfig[] = [];
+
+// ── Server-side spike detection state ──
+const prevSpikeIps = new Map<string, Set<string>>();
+const prevAllSpike = new Map<string, boolean>();
+const pendingAllSpike = new Map<string, { rxBps: number; txBps: number; iface: string } | null>();
+const spikeConfigCache = new Map<string, SpikeConfig>();
+
+function getCachedSpikeConfig(serverId: string): SpikeConfig {
+  let cached = spikeConfigCache.get(serverId);
+  if (!cached) {
+    cached = dbGetSpikeConfig(serverId);
+    spikeConfigCache.set(serverId, cached);
+  }
+  return cached;
+}
+
+export function invalidateSpikeConfigCache(serverId: string): void {
+  spikeConfigCache.delete(serverId);
+}
+
+function checkSpikeAfterNetwork(serverId: string, clients: NetworkClient[]): void {
+  const config = serverConfigs.find((s) => s.id === serverId);
+  if (!config || !config.features?.includes('spike')) return;
+
+  const cfg = getCachedSpikeConfig(serverId);
+  const thresholdBps = cfg.personalThresholdMbps * 1_000_000;
+
+  // Detect personal spikes
+  const spiking = clients.filter((c) => (c.rateIn + c.rateOut) * 8 > thresholdBps);
+  const currentSpikeIps = new Set(spiking.map((c) => c.ip));
+  const prevIps = prevSpikeIps.get(serverId) || new Set();
+
+  for (const client of spiking) {
+    if (!prevIps.has(client.ip)) {
+      const event: SpikeEvent = {
+        id: `${Date.now()}-${client.ip}`,
+        timestamp: new Date().toISOString(),
+        type: 'personal',
+        ip: client.ip,
+        label: client.label || client.hostname || client.ip,
+        peakRateIn: client.rateIn,
+        peakRateOut: client.rateOut,
+      };
+      insertSpikeEvent(serverId, event);
+      broadcast(`server:${serverId}:spikes`, event);
+    }
+  }
+
+  prevSpikeIps.set(serverId, currentSpikeIps);
+
+  // Flush pending all-traffic spike if we have fresh client rates
+  const pending = pendingAllSpike.get(serverId);
+  if (pending) {
+    const hasRates = clients.some((c) => c.rateIn > 0 || c.rateOut > 0);
+    if (hasRates) {
+      const sorted = [...clients].sort((a, b) => (b.rateIn + b.rateOut) - (a.rateIn + a.rateOut));
+      const consumers: SpikeConsumer[] = sorted.slice(0, 10).map((c) => ({
+        ip: c.ip,
+        label: c.label || c.hostname || c.ip,
+        rateIn: c.rateIn,
+        rateOut: c.rateOut,
+      }));
+      const event: SpikeEvent = {
+        id: `${Date.now()}-all`,
+        timestamp: new Date().toISOString(),
+        type: 'all',
+        ip: '',
+        label: `Interface: ${pending.iface}`,
+        peakRateIn: 0,
+        peakRateOut: 0,
+        totalRxBps: pending.rxBps,
+        totalTxBps: pending.txBps,
+        topConsumers: consumers,
+      };
+      insertSpikeEvent(serverId, event);
+      broadcast(`server:${serverId}:spikes`, event);
+      pendingAllSpike.set(serverId, null);
+    }
+  }
+}
+
+function checkSpikeAfterTraffic(serverId: string, point: TrafficPoint): void {
+  const config = serverConfigs.find((s) => s.id === serverId);
+  if (!config || !config.features?.includes('spike')) return;
+
+  const cfg = getCachedSpikeConfig(serverId);
+  const thresholdBps = cfg.allThresholdMbps * 1_000_000;
+  const totalBps = point.rxBps + point.txBps;
+  const isSpiking = totalBps > thresholdBps;
+
+  if (isSpiking && !prevAllSpike.get(serverId)) {
+    pendingAllSpike.set(serverId, { rxBps: point.rxBps, txBps: point.txBps, iface: point.interface });
+  } else if (!isSpiking) {
+    pendingAllSpike.set(serverId, null);
+  }
+
+  prevAllSpike.set(serverId, isSpiking);
+}
+
+export function getSpikeEventsForBackfill(serverId: string): SpikeEvent[] {
+  return getRecentSpikeEvents(serverId, 50);
+}
 
 function syncConfigFromDisk() {
   try {
@@ -382,6 +485,9 @@ async function pollTraffic() {
       }
 
       broadcast(`server:${serverId}:traffic`, point);
+
+      // Server-side spike detection after traffic data
+      checkSpikeAfterTraffic(serverId, point);
     } catch (err) {
       logger.warn('metrics', `Traffic poll failed for ${serverId}`, { error: (err as Error).message });
     }
@@ -505,6 +611,9 @@ async function pollNetwork() {
       previousNetworkSnapshot.set(serverId, newSnapshot);
       networkCache.set(serverId, clients);
       broadcast(`server:${serverId}:network`, { clients });
+
+      // Server-side spike detection after network data
+      checkSpikeAfterNetwork(serverId, clients);
     } catch (err) {
       logger.warn('metrics', `Network poll failed for ${serverId}`, { error: (err as Error).message });
     }
@@ -698,6 +807,10 @@ export function removeServerFromCollector(serverId: string) {
   previousWinnetTraffic.delete(serverId);
   previousOverviewBandwidth.delete(serverId);
   clearDestAccumulator(serverId);
+  prevSpikeIps.delete(serverId);
+  prevAllSpike.delete(serverId);
+  pendingAllSpike.delete(serverId);
+  spikeConfigCache.delete(serverId);
 }
 
 export function updateServerInCollector(config: ServerConfig) {

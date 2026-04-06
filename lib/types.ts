@@ -48,10 +48,35 @@ export interface ClientMessage {
 }
 
 export interface ServerMessage {
-  type: 'overview' | 'stats' | 'traffic' | 'hotspot' | 'network' | 'winnet' | 'error';
+  type: 'overview' | 'stats' | 'traffic' | 'hotspot' | 'network' | 'winnet' | 'spikes' | 'error';
   serverId?: string;
   data: unknown;
   timestamp: string;
+}
+
+export interface SpikeConsumer {
+  ip: string;
+  label: string;
+  rateIn: number;
+  rateOut: number;
+}
+
+export interface SpikeEvent {
+  id: string;
+  timestamp: string;
+  type: 'personal' | 'all';
+  ip: string;
+  label: string;
+  peakRateIn: number;
+  peakRateOut: number;
+  totalRxBps?: number;
+  totalTxBps?: number;
+  topConsumers?: SpikeConsumer[];
+}
+
+export interface SpikeConfig {
+  personalThresholdMbps: number;
+  allThresholdMbps: number;
 }
 
 export interface CpuRamData {
