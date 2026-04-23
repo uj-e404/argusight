@@ -49,6 +49,7 @@ const FEATURE_OPTIONS: Record<ServerType, { value: string; label: string }[]> = 
     { value: 'traffic', label: 'Traffic' },
     { value: 'domains', label: 'Domains' },
     { value: 'hotspot', label: 'Hotspot' },
+    { value: 'vpn', label: 'VPN (WireGuard)' },
     { value: 'network', label: 'Network' },
   ],
 };

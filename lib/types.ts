@@ -163,7 +163,7 @@ export interface NetworkClient {
   _bytesCumulative?: boolean;
 }
 
-export type { MikroTikHotspotUser, MikroTikInterface } from './parsers/mikrotik';
+export type { MikroTikHotspotUser, MikroTikInterface, MikroTikVpnPeer } from './parsers/mikrotik';
 
 export interface WindowsNetProcess {
   pid: number;

@@ -32,6 +32,21 @@ export interface MikroTikHotspotUser {
   rateOut: number;
 }
 
+export interface MikroTikVpnPeer {
+  id: string;
+  interface: string;
+  name: string;
+  publicKey: string;
+  allowedAddress: string;
+  endpoint: string;
+  lastHandshake: string;
+  lastHandshakeSeconds: number;
+  rx: number;
+  tx: number;
+  disabled: boolean;
+  online: boolean;
+}
+
 export interface MikroTikDnsEntry {
   name: string;
   address: string;
@@ -503,6 +518,111 @@ export function parseMikroTikHotspotDetail(raw: string): MikroTikHotspotUser[] {
       bytesOut: parseBytesValue(getValue('bytes-out')),
       rateIn: 0,
       rateOut: 0,
+    });
+  }
+  return results;
+}
+
+function parseDurationToSeconds(val: string): number {
+  if (!val) return Infinity;
+  // RouterOS format: "1w2d3h4m5s" / "2m30s" / "45s" / "3d4h"
+  const re = /(\d+)(w|d|h|m|s)/g;
+  let total = 0;
+  let m: RegExpExecArray | null;
+  let matched = false;
+  while ((m = re.exec(val)) !== null) {
+    matched = true;
+    const n = parseInt(m[1], 10);
+    switch (m[2]) {
+      case 'w': total += n * 604800; break;
+      case 'd': total += n * 86400; break;
+      case 'h': total += n * 3600; break;
+      case 'm': total += n * 60; break;
+      case 's': total += n; break;
+    }
+  }
+  return matched ? total : Infinity;
+}
+
+export function parseMikroTikVpnPeers(raw: string): MikroTikVpnPeer[] {
+  const results: MikroTikVpnPeer[] = [];
+
+  // `/interface/wireguard/peers/print detail` format:
+  //  0  X ;;; optional comment
+  //     interface=wg-server public-key="..." endpoint-address="" endpoint-port=51820
+  //     current-endpoint-address=1.2.3.4 current-endpoint-port=51820
+  //     allowed-address=10.10.10.2/32 rx=12345 tx=54321 last-handshake=2m30s
+  //     name="alice-laptop"
+  const entries = raw.split(/(?=^\s*\d+\s)/m).filter(Boolean);
+
+  for (const entry of entries) {
+    if (/^Flags/i.test(entry.trim())) continue;
+
+    // Capture entry index + flags before folding into one line
+    const header = entry.match(/^\s*(\d+)\s+([A-Z\s]*?)(?=[a-z;]|$)/);
+    const id = header?.[1] ?? '';
+    const flags = header?.[2]?.trim() ?? '';
+
+    // Extract inline comment (;;; comment) before it gets swallowed
+    const commentMatch = entry.match(/;;;\s*(.+?)(?:\r?\n|$)/);
+    const inlineComment = commentMatch?.[1]?.trim() ?? '';
+
+    // Fold continuation lines into a single flat string
+    const flat = entry.replace(/\r?\n\s+/g, ' ').trim();
+
+    const getValue = (key: string): string => {
+      const re = new RegExp(`(?:^|\\s)${key}=(?:"([^"]*)"|([^\\s]+))`);
+      const m = flat.match(re);
+      return m ? (m[1] ?? m[2] ?? '') : '';
+    };
+
+    const publicKey = getValue('public-key');
+    const iface = getValue('interface');
+    if (!publicKey && !iface) continue;
+
+    const name = getValue('name') || inlineComment || getValue('comment');
+    const currentEp = getValue('current-endpoint-address');
+    const currentPort = getValue('current-endpoint-port');
+    const staticEp = getValue('endpoint-address');
+    const staticPort = getValue('endpoint-port');
+    const endpoint = currentEp
+      ? `${currentEp}${currentPort && currentPort !== '0' ? ':' + currentPort : ''}`
+      : staticEp
+        ? `${staticEp}${staticPort && staticPort !== '0' ? ':' + staticPort : ''}`
+        : '';
+
+    const lastHandshake = getValue('last-handshake');
+    const lastHandshakeSeconds = parseDurationToSeconds(lastHandshake);
+
+    const parseBytes = (v: string): number => {
+      if (!v) return 0;
+      const m = v.match(/^([\d.]+)\s*(GiB|MiB|KiB)?/i);
+      if (!m) return parseInt(v, 10) || 0;
+      const n = parseFloat(m[1]);
+      const u = (m[2] || '').toLowerCase();
+      if (u === 'gib') return Math.round(n * 1073741824);
+      if (u === 'mib') return Math.round(n * 1048576);
+      if (u === 'kib') return Math.round(n * 1024);
+      return Math.round(n);
+    };
+
+    const disabled = flags.includes('X');
+    // WireGuard refreshes handshake every ~2min when active; 3min threshold gives headroom.
+    const online = !disabled && lastHandshake !== '' && lastHandshakeSeconds < 180;
+
+    results.push({
+      id,
+      interface: iface,
+      name,
+      publicKey,
+      allowedAddress: getValue('allowed-address'),
+      endpoint,
+      lastHandshake,
+      lastHandshakeSeconds: lastHandshakeSeconds === Infinity ? -1 : lastHandshakeSeconds,
+      rx: parseBytes(getValue('rx')),
+      tx: parseBytes(getValue('tx')),
+      disabled,
+      online,
     });
   }
   return results;

@@ -5,7 +5,9 @@ import {
   BarChart3,
   Users,
   Network,
-  Globe,
+  Shield,
+  ShieldCheck,
+  ShieldOff,
   ArrowDownToLine,
   ArrowUpFromLine,
   Zap,
@@ -35,6 +37,7 @@ import { usePolling } from './usePolling';
 import { useServerTraffic } from '@/hooks/useServerTraffic';
 import { useServerHotspot } from '@/hooks/useServerHotspot';
 import { useServerNetwork } from '@/hooks/useServerNetwork';
+import { useServerVpn } from '@/hooks/useServerVpn';
 import { useWebSocket } from '@/hooks/WebSocketProvider';
 import { useSpikeMonitor } from '@/hooks/useSpikeMonitor';
 import type { SpikeEvent } from '@/lib/types';
@@ -45,7 +48,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { formatBps } from '@/lib/format';
-import type { MikroTikInterface, DomainTrafficEntry } from '@/lib/types';
+import type { MikroTikInterface } from '@/lib/types';
 
 interface MikroTikAllStatusTabProps {
   serverId: string;
@@ -96,8 +99,15 @@ function buildQueue(features: string[]): string[] {
   const queue: string[] = [];
   if (features.includes('hotspot')) queue.push('hotspot');
   if (features.includes('network')) queue.push('network');
-  if (features.includes('domains')) queue.push('domains');
+  if (features.includes('vpn')) queue.push('vpn');
   return queue;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(2)} GB`;
+  if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`;
+  if (bytes >= 1_024) return `${(bytes / 1_024).toFixed(0)} KB`;
+  return `${bytes} B`;
 }
 
 function TrafficSection({ serverId }: { serverId: string }) {
@@ -387,66 +397,107 @@ function NetworkSection({ serverId, onReady }: { serverId: string; onReady: () =
   );
 }
 
-function DomainsSection({ serverId, onReady }: { serverId: string; onReady: () => void }) {
-  const { data, loading } = usePolling<{ domains: DomainTrafficEntry[] }>(
-    `/api/servers/${serverId}/domains`,
-    5000
-  );
+function VpnSection({ serverId, onReady }: { serverId: string; onReady: () => void }) {
+  const { peers, totalRx, totalTx, totalRateIn, totalRateOut, onlineCount, loading } = useServerVpn(serverId, 5000);
   const firedRef = useRef(false);
 
-  const domains = data?.domains ?? [];
-  const top5 = useMemo(
-    () => [...domains].sort((a, b) => b.connections - a.connections).slice(0, 5),
-    [domains]
-  );
+  const top5 = useMemo(() => {
+    const ranked = [...peers].sort((a, b) => {
+      if (a.online !== b.online) return a.online ? -1 : 1;
+      return (b.rateIn + b.rateOut) - (a.rateIn + a.rateOut);
+    });
+    return ranked.slice(0, 5);
+  }, [peers]);
 
   useEffect(() => {
-    if (data && !firedRef.current) {
+    if (!loading && !firedRef.current) {
       firedRef.current = true;
       onReady();
     }
-  }, [data, onReady]);
+  }, [loading, onReady]);
 
-  if (!data && loading) {
-    return <SectionSkeleton icon={Globe} title="Domains" />;
+  if (loading && peers.length === 0) {
+    return <SectionSkeleton icon={Shield} title="VPN" />;
   }
 
   return (
     <div className="bg-bg-surface border border-bg-elevated rounded-lg p-4">
       <div className="flex items-center gap-2 mb-3">
-        <Globe className="h-4 w-4 text-text-muted" />
-        <h3 className="text-sm font-semibold text-text-primary">Domains</h3>
+        <Shield className="h-4 w-4 text-text-muted" />
+        <h3 className="text-sm font-semibold text-text-primary">VPN</h3>
       </div>
 
-      <div className="flex items-center gap-1.5 mb-3">
-        <span className="text-xs text-text-muted">Total:</span>
-        <span className="font-mono text-sm font-bold text-text-primary">{domains.length}</span>
+      <div className="flex flex-wrap gap-4 mb-3">
+        <div className="flex items-center gap-1.5">
+          <ShieldCheck className="h-3.5 w-3.5 text-status-healthy" />
+          <span className="text-xs text-text-muted">Online:</span>
+          <span className="font-mono text-sm font-bold text-text-primary">
+            <span className="text-status-healthy">{onlineCount}</span>
+            <span className="text-text-muted"> / {peers.length}</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <ArrowDownToLine className="h-3.5 w-3.5 text-status-info" />
+          <div className="flex flex-col leading-tight">
+            <span className="font-mono text-xs font-bold text-status-info">{formatRate(totalRateIn)}</span>
+            <span className="font-mono text-[10px] text-text-muted">{formatBytes(totalRx)}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <ArrowUpFromLine className="h-3.5 w-3.5 text-status-healthy" />
+          <div className="flex flex-col leading-tight">
+            <span className="font-mono text-xs font-bold text-status-healthy">{formatRate(totalRateOut)}</span>
+            <span className="font-mono text-[10px] text-text-muted">{formatBytes(totalTx)}</span>
+          </div>
+        </div>
       </div>
 
       {top5.length > 0 && (
         <Table>
           <TableHeader>
             <TableRow className="border-bg-elevated hover:bg-transparent">
-              <TableHead className="text-text-muted text-xs py-1">Domain</TableHead>
-              <TableHead className="text-text-muted text-xs py-1 text-right">Conns</TableHead>
+              <TableHead className="text-text-muted text-xs py-1">Peer</TableHead>
+              <TableHead className="text-text-muted text-xs py-1 text-right">Rate</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {top5.map((d) => (
-              <TableRow key={`${d.name}-${d.address}`} className="border-bg-elevated">
-                <TableCell className="py-1.5 whitespace-normal">
-                  <div className="flex flex-col">
-                    <span className="text-xs text-text-secondary leading-tight break-all">
-                      {d.name}
-                    </span>
-                    <span className="font-mono text-[11px] text-text-muted leading-tight">{d.address}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="font-mono text-xs text-gold-primary font-bold text-right py-1.5">
-                  {d.connections}
-                </TableCell>
-              </TableRow>
-            ))}
+            {top5.map((p) => {
+              const StatusIcon = p.disabled ? ShieldOff : p.online ? ShieldCheck : Shield;
+              const statusColor = p.disabled
+                ? 'text-text-muted'
+                : p.online
+                  ? 'text-status-healthy'
+                  : 'text-text-muted';
+              return (
+                <TableRow key={p.publicKey || p.id} className="border-bg-elevated">
+                  <TableCell className="py-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <StatusIcon className={`h-3 w-3 flex-shrink-0 ${statusColor}`} />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs text-text-secondary leading-tight truncate">
+                          {p.name || p.publicKey.slice(0, 12) + '…'}
+                        </span>
+                        <span className="font-mono text-[11px] text-text-muted leading-tight">
+                          {p.allowedAddress || '-'}
+                        </span>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-1.5 text-right">
+                    <div className="flex flex-col leading-tight items-end">
+                      <span className="font-mono text-xs">
+                        <span className="text-status-info">{formatRate(p.rateIn)}</span>
+                        <span className="text-text-muted mx-1">/</span>
+                        <span className="text-status-healthy">{formatRate(p.rateOut)}</span>
+                      </span>
+                      <span className="font-mono text-[10px] text-text-muted">
+                        {formatBytes(p.rx)} / {formatBytes(p.tx)}
+                      </span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       )}
@@ -767,7 +818,7 @@ export function MikroTikAllStatusTab({ serverId, features }: MikroTikAllStatusTa
       </div>
 
       {/* Bottom grid: remaining sections */}
-      {(features.includes('hotspot') || features.includes('network') || features.includes('domains')) && (
+      {(features.includes('hotspot') || features.includes('network') || features.includes('vpn') || features.includes('spike')) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {features.includes('hotspot') && (
             isEnabled('hotspot') ? (
@@ -783,11 +834,11 @@ export function MikroTikAllStatusTab({ serverId, features }: MikroTikAllStatusTa
               <SectionSkeleton icon={Network} title="Network" />
             )
           )}
-          {features.includes('domains') && (
-            isEnabled('domains') ? (
-              <DomainsSection serverId={serverId} onReady={() => markReady('domains')} />
+          {features.includes('vpn') && (
+            isEnabled('vpn') ? (
+              <VpnSection serverId={serverId} onReady={() => markReady('vpn')} />
             ) : (
-              <SectionSkeleton icon={Globe} title="Domains" />
+              <SectionSkeleton icon={Shield} title="VPN" />
             )
           )}
           {features.includes('spike') && (

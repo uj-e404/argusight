@@ -18,6 +18,7 @@ import { TrafficChart } from './components/TrafficChart';
 import { DomainTable } from './components/DomainTable';
 import { HotspotTable } from './components/HotspotTable';
 import { NetworkTable } from './components/NetworkTable';
+import { VpnTable } from './components/VpnTable';
 import { WindowsNetworkTab } from './components/WindowsNetworkTab';
 import { SpikeMonitor } from './components/SpikeMonitor';
 import { useWebSocket } from '@/hooks/WebSocketProvider';
@@ -48,6 +49,7 @@ function buildTabs(server: ServerInfo): string[] {
     if (server.features?.includes('traffic')) tabs.push('Traffic');
     if (server.features?.includes('domains')) tabs.push('Domains');
     if (server.features?.includes('hotspot')) tabs.push('Hotspot');
+    if (server.features?.includes('vpn')) tabs.push('VPN');
     if (server.features?.includes('network')) tabs.push('Network');
     if (server.features?.includes('spike')) tabs.push('Spike');
     return tabs;
@@ -225,6 +227,11 @@ export function ServerDetailClient({ serverId, initialServer }: ServerDetailClie
             <HotspotTable serverId={serverId} />
           </TabsContent>
         )}
+        {tabs.includes('VPN') && (
+          <TabsContent value="VPN">
+            <VpnTable serverId={serverId} />
+          </TabsContent>
+        )}
         {tabs.includes('Spike') && (
           <TabsContent value="Spike">
             <SpikeMonitor serverId={serverId} />
@@ -233,7 +240,10 @@ export function ServerDetailClient({ serverId, initialServer }: ServerDetailClie
         {tabs.includes('Network') && (
           <TabsContent value="Network">
             {server.type === 'mikrotik' ? (
-              <NetworkTable serverId={serverId} />
+              <NetworkTable
+                serverId={serverId}
+                showVpnSummary={server.features?.includes('vpn') ?? false}
+              />
             ) : (server.type === 'windows' || server.type === 'linux') ? (
               <WindowsNetworkTab serverId={serverId} />
             ) : (

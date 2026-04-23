@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, ArrowUpDown, ChevronDown, ChevronRight, Network, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
+import { Search, ArrowUpDown, ChevronDown, ChevronRight, Network, ArrowDownToLine, ArrowUpFromLine, ShieldCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -12,11 +12,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useServerNetwork } from '@/hooks/useServerNetwork';
+import { useServerVpn } from '@/hooks/useServerVpn';
 import { TableSkeleton } from '@/components/ui/table-skeleton';
 import type { NetworkClient } from '@/lib/types';
 
 interface NetworkTableProps {
   serverId: string;
+  showVpnSummary?: boolean;
 }
 
 type SortField = 'hostname' | 'ip' | 'rateIn' | 'rateOut' | 'connections';
@@ -44,8 +46,9 @@ function rateColor(bytesPerSec: number): string {
   return 'text-status-healthy';
 }
 
-export function NetworkTable({ serverId }: NetworkTableProps) {
+export function NetworkTable({ serverId, showVpnSummary = false }: NetworkTableProps) {
   const { clients, loading } = useServerNetwork(serverId);
+  const vpn = useServerVpn(serverId, 5000, showVpnSummary);
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('rateIn');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -139,6 +142,33 @@ export function NetworkTable({ serverId }: NetworkTableProps) {
             <span className="text-xs text-text-muted">Upload</span>
             <span className="font-mono text-sm font-bold text-status-healthy">{formatRate(totalRateOut)}</span>
           </div>
+          {showVpnSummary && !vpn.loading && (
+            <>
+              <div className="hidden sm:block w-px bg-bg-elevated" />
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-gold-primary" />
+                <span className="text-xs text-text-muted">VPN Online</span>
+                <span className="font-mono text-lg font-bold text-text-primary">
+                  <span className="text-status-healthy">{vpn.onlineCount}</span>
+                  <span className="text-text-muted"> / {vpn.peers.length}</span>
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <ArrowDownToLine className="h-4 w-4 text-status-info" />
+                <div className="flex flex-col leading-tight">
+                  <span className="font-mono text-sm font-bold text-status-info">{formatRate(vpn.totalRateIn)}</span>
+                  <span className="font-mono text-[10px] text-text-muted">VPN {formatBytes(vpn.totalRx)}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <ArrowUpFromLine className="h-4 w-4 text-status-healthy" />
+                <div className="flex flex-col leading-tight">
+                  <span className="font-mono text-sm font-bold text-status-healthy">{formatRate(vpn.totalRateOut)}</span>
+                  <span className="font-mono text-[10px] text-text-muted">VPN {formatBytes(vpn.totalTx)}</span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
